@@ -14,6 +14,7 @@ fn pivot(tab: &mut DMatrix<T>, col: usize, row: usize) {
         }
     }
 }
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum PivotChoice {
     Pivot(usize, usize),
@@ -43,16 +44,21 @@ fn simplex<F: Fn(&DMatrix<T>) -> PivotChoice>(
         }
     }
 }
-fn choose_pivot_standard_limited(tab: &DMatrix<T>, row_limit: usize) -> PivotChoice {
-    //let col = tab.row(0).view((0,1) ,(0,tab.ncols()-1)).imin()+1;
-    let col = tab
-        .row(0)
+fn choose_pivot_col_min(tab: &DMatrix<T>) -> usize {
+    tab.row(0)
         .iter()
         .enumerate()
         .skip(1)
         .min_by(|(_, v1), (_, v2)| v1.partial_cmp(v2).unwrap())
         .unwrap()
-        .0;
+        .0
+}
+fn choose_pivot_standard_limited<F: Fn(&DMatrix<T>) -> usize>(
+    tab: &DMatrix<T>,
+    choose_col: F,
+    row_limit: usize,
+) -> PivotChoice {
+    let col = choose_col(tab);
     if tab[(0, col)] >= 0f64 {
         PivotChoice::Optimal
     } else {
@@ -187,7 +193,7 @@ impl Solver<LP> for PrimalTwoPhaseSimplex {
         ];
 
         let out = simplex(&mut tab, |tab: &DMatrix<T>| {
-            choose_pivot_standard_limited(tab, tab.nrows() - 1)
+            choose_pivot_standard_limited(tab, choose_pivot_col_min, tab.nrows() - 1)
         });
         debug_assert!(out == SimplexOutput::Optimal);
         if tab[(0, 0)] != 0f64 {
@@ -200,7 +206,7 @@ impl Solver<LP> for PrimalTwoPhaseSimplex {
         tab.swap_rows(0, new_height);
         tab.resize_vertically_mut(new_height, 0f64);
         let out = simplex(&mut tab, |tab: &DMatrix<T>| {
-            choose_pivot_standard_limited(tab, tab.nrows())
+            choose_pivot_standard_limited(tab, choose_pivot_col_min, tab.nrows())
         });
         if out == SimplexOutput::Unlimited {
             return [SolverEvent::<LP>::Unlimited].into_iter();
