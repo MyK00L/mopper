@@ -19,12 +19,12 @@ fn pivot(tab: &mut DMatrix<T>, col: usize, row: usize) {
 enum PivotChoice {
     Pivot(usize, usize),
     Optimal,
-    Unlimited,
+    Unbounded,
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum SimplexOutput {
     Optimal,
-    Unlimited,
+    Unbounded,
 }
 fn simplex<F: Fn(&DMatrix<T>) -> PivotChoice>(
     tab: &mut DMatrix<T>,
@@ -38,8 +38,8 @@ fn simplex<F: Fn(&DMatrix<T>) -> PivotChoice>(
             PivotChoice::Optimal => {
                 return SimplexOutput::Optimal;
             }
-            PivotChoice::Unlimited => {
-                return SimplexOutput::Unlimited;
+            PivotChoice::Unbounded => {
+                return SimplexOutput::Unbounded;
             }
         }
     }
@@ -73,7 +73,7 @@ fn choose_pivot_standard_limited<F: Fn(&DMatrix<T>) -> usize>(
             .max_by(|(_, v1), (_, v2)| v1.partial_cmp(v2).unwrap());
         row_opt
             .map(|(row, _)| PivotChoice::Pivot(col, row))
-            .unwrap_or(PivotChoice::Unlimited)
+            .unwrap_or(PivotChoice::Unbounded)
     }
 }
 struct LPEqMin {
@@ -208,8 +208,8 @@ impl Solver<LP> for PrimalTwoPhaseSimplex {
         let out = simplex(&mut tab, |tab: &DMatrix<T>| {
             choose_pivot_standard_limited(tab, choose_pivot_col_min, tab.nrows())
         });
-        if out == SimplexOutput::Unlimited {
-            return vec![SolverEvent::<LP>::PrimalBound(Obj::Unlimited)].into_iter();
+        if out == SimplexOutput::Unbounded {
+            return vec![SolverEvent::<LP>::PrimalBound(Obj::Unbounded)].into_iter();
         }
 
         let x: DVector<T> = DVector::<T>::from_iterator(

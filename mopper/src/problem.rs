@@ -5,7 +5,7 @@ use std::marker::PhantomData;
 /// Type for the objective function of a problem
 #[derive(PartialEq, PartialOrd, Clone, Copy, Debug)]
 pub enum Obj<Z: Clone + Copy + PartialOrd + Debug> {
-    Unlimited,
+    Unbounded,
     Some(Z),
     Infeasible,
 }
@@ -38,7 +38,7 @@ impl<P: Problem> Default for SolverOutput<P> {
         Self {
             best_solution: None,
             primal_bound: Obj::Infeasible,
-            dual_bound: Obj::Unlimited,
+            dual_bound: Obj::Unbounded,
         }
     }
 }
@@ -111,7 +111,7 @@ mod test {
     use crate::*;
     #[test]
     fn test_obj_ord() {
-        let a = Obj::<f64>::Unlimited;
+        let a = Obj::<f64>::Unbounded;
         let b = Obj::<f64>::Some(1f64);
         let c = Obj::<f64>::Some(2f64);
         let d = Obj::<f64>::Infeasible;
