@@ -1,5 +1,5 @@
 #![allow(unused)]
-use crate::{Problem, Reducer, Solver, SolverEvent};
+use crate::{Obj, Problem, Reducer, Solver, SolverEvent};
 use nalgebra::{Const, DMatrix, DVector, Dyn, Matrix, RowDVector, Vector};
 use std::ops::{AddAssign, MulAssign, SubAssign};
 
@@ -197,7 +197,7 @@ impl Solver<LP> for PrimalTwoPhaseSimplex {
         });
         debug_assert!(out == SimplexOutput::Optimal);
         if tab[(0, 0)] != 0f64 {
-            return [SolverEvent::<LP>::Infeasible].into_iter();
+            return vec![SolverEvent::<LP>::DualBound(Obj::Infeasible)].into_iter();
         }
 
         let new_width = tab.ncols() - extra_two_phase;
@@ -209,7 +209,7 @@ impl Solver<LP> for PrimalTwoPhaseSimplex {
             choose_pivot_standard_limited(tab, choose_pivot_col_min, tab.nrows())
         });
         if out == SimplexOutput::Unlimited {
-            return [SolverEvent::<LP>::Unlimited].into_iter();
+            return vec![SolverEvent::<LP>::PrimalBound(Obj::Unlimited)].into_iter();
         }
 
         let x: DVector<T> = DVector::<T>::from_iterator(
@@ -233,7 +233,11 @@ impl Solver<LP> for PrimalTwoPhaseSimplex {
         );
         let z = -tab[(0, 0)];
 
-        [SolverEvent::<LP>::OptimalSolution(x, z)].into_iter()
+        vec![
+            SolverEvent::<LP>::Solution(x, z),
+            SolverEvent::<LP>::DualBound(Obj::Some(z)),
+        ]
+        .into_iter()
     }
 }
 

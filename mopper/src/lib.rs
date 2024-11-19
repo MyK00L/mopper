@@ -1,5 +1,6 @@
 #![feature(gen_blocks)]
 
+pub mod comb;
 pub mod lp;
 pub mod problem;
 pub use problem::*;
