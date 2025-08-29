@@ -64,7 +64,7 @@ pub trait NeighbourSpace<P: Problem>: From<P> {
     ) -> impl Iterator<Item = (P::Obj, Self::NeighbourId)> {
         let mut neigh: Vec<(P::Obj, Self::NeighbourId)> = self
             .neighbourhood_feas(n)
-            .map(|x| (self.eval_neigh(&n, &x), x))
+            .map(|x| (self.eval_neigh(n, &x), x))
             .collect();
         neigh.sort_by_key(|x| x.0);
         neigh.into_iter()
@@ -84,7 +84,7 @@ pub trait TreeSpace<P: Problem> {
     fn ordered_children(&self, n: &Self::Node) -> impl Iterator<Item = (P::Obj, Self::ChildId)> {
         let mut cld: Vec<(P::Obj, Self::ChildId)> = self
             .children(n)
-            .map(|x| (self.child_dual_bound(&n, &x), x))
+            .map(|x| (self.child_dual_bound(n, &x), x))
             .collect();
         cld.sort_by_key(|x| x.0);
         cld.into_iter()
