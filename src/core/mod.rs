@@ -18,11 +18,72 @@ pub trait Problem {
     type Obj: Objective;
 }
 
-// TODO: fast timer, rng (splitmix64), random problem generation stuff
+/// Trait for random number generation
+pub trait Rng {
+    fn next_u64(&mut self) -> u64;
+    #[allow(clippy::should_implement_trait)]
+    fn next<T: From<u64>>(&mut self) -> T {
+        self.next_u64().into()
+    }
+    fn next01(&mut self) -> f64 {
+        self.next_u64() as f64 / u64::MAX as f64
+    }
+}
+/// The actual random number generator
+pub struct Splitmix64(u64);
+impl Splitmix64 {
+    pub fn from_u64(seed: u64) -> Self {
+        Self(seed)
+    }
+}
+impl Rng for Splitmix64 {
+    fn next_u64(&mut self) -> u64 {
+        let mut z = self.0.wrapping_add(0x9e3779b97f4a7c15);
+        self.0 = z;
+        z = (z ^ (z >> 30)).wrapping_mul(0xbf58476d1ce4e5b9);
+        z = (z ^ (z >> 27)).wrapping_mul(0x94d049bb133111eb);
+        z ^ (z >> 31)
+    }
+}
+
+// TODO: random problem generation stuff
+
+/// timer trait to use as stopping conditions for solvers
+pub trait Timer {
+    type Duration: Into<std::time::Duration> + From<std::time::Duration>;
+    fn time(&self) -> Self::Duration;
+}
+#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+pub struct RdtscTimer<const TICKS_PER_SEC: u64>;
+#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+pub struct RdtscTimerDuration<const TICKS_PER_SEC: u64>(u64);
+#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+impl<const TICKS_PER_SEC: u64> From<std::time::Duration> for RdtscTimerDuration<TICKS_PER_SEC> {
+    fn from(d: std::time::Duration) -> Self {
+        Self((d.as_nanos() * TICKS_PER_SEC as u128 / 1000000000) as u64)
+    }
+}
+#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+impl<const TICKS_PER_SEC: u64> From<RdtscTimerDuration<TICKS_PER_SEC>> for std::time::Duration {
+    fn from(rdtsc: RdtscTimerDuration<TICKS_PER_SEC>) -> std::time::Duration {
+        std::time::Duration::from_nanos(rdtsc.0 * 1000000000 / TICKS_PER_SEC)
+    }
+}
+#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+impl<const TICKS_PER_SEC: u64> Timer for RdtscTimer<TICKS_PER_SEC> {
+    type Duration = RdtscTimerDuration<TICKS_PER_SEC>;
+    fn time(&self) -> Self::Duration {
+        #[cfg(target_arch = "x86_64")]
+        return RdtscTimerDuration::<TICKS_PER_SEC>(unsafe { core::arch::x86_64::_rdtsc() });
+        #[cfg(target_arch = "x86")]
+        return RdtscTimerDuration::<TICKS_PER_SEC>(unsafe { core::arch::x86::_rdtsc() });
+    }
+}
 
 /// Represents a solver for a problem
 pub trait Solver<P: Problem> {
-    // TODO: also return a list of primal/dual bounds with their timestamps
+    // TODO: also return a list of primal/dual bounds with their timestamps, add stopping
+    // conditions
     fn solve(p: P) -> P::Solution;
 }
 
