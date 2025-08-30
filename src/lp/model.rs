@@ -13,17 +13,22 @@ pub struct Expression {
     variables: Vec<(usize, f64)>,
 }
 impl Expression {
-    fn cons(val: f64) -> Self {
+    pub fn cons(val: f64) -> Self {
         Self {
             constant: val,
             variables: vec![],
         }
     }
-    fn from_var_id(id: usize) -> Self {
+    pub fn from_var_id(id: usize) -> Self {
         Self {
             constant: 0f64,
             variables: vec![(id, 1f64)],
         }
+    }
+}
+impl From<&Expression> for Expression {
+    fn from(e: &Expression) -> Self {
+        e.clone()
     }
 }
 impl<T: Into<f64>> From<T> for Expression {
@@ -79,9 +84,9 @@ impl Mul<&Expression> for i64 {
         rhs.clone() * self as f64
     }
 }
-
-impl AddAssign<&Expression> for Expression {
-    fn add_assign(&mut self, other: &Self) {
+impl<T: Into<Expression>> AddAssign<T> for Expression {
+    fn add_assign(&mut self, othert: T) {
+        let other = othert.into();
         self.constant += other.constant;
         let mut nv = Vec::<(usize, f64)>::new();
         let mut i0 = self.variables.iter().peekable();
@@ -114,37 +119,19 @@ impl AddAssign<&Expression> for Expression {
         self.variables = nv
     }
 }
-impl AddAssign for Expression {
-    fn add_assign(&mut self, other: Self) {
-        *self += &other;
-    }
-}
-impl Add for Expression {
+impl<T: Into<Expression>> Add<T> for Expression {
     type Output = Expression;
-    fn add(mut self, rhs: Expression) -> Self::Output {
-        self += rhs;
+    fn add(mut self, rhs: T) -> Self::Output {
+        self += rhs.into();
         self
     }
 }
-impl Add<&Expression> for Expression {
+impl<T: Into<Expression>> Add<T> for &Expression {
     type Output = Expression;
-    fn add(self, rhs: &Expression) -> Self::Output {
-        self + rhs.clone()
-    }
-}
-impl Add for &Expression {
-    type Output = Expression;
-    fn add(self, rhs: &Expression) -> Self::Output {
-        self.clone() + rhs.clone()
-    }
-}
-impl Add<Expression> for &Expression {
-    type Output = Expression;
-    fn add(self, rhs: Expression) -> Self::Output {
+    fn add(self, rhs: T) -> Self::Output {
         self.clone() + rhs
     }
 }
-
 impl Neg for Expression {
     type Output = Self;
     fn neg(self) -> Self::Output {
@@ -157,105 +144,54 @@ impl Neg for &Expression {
         -1.0 * self.clone()
     }
 }
-impl SubAssign<&Expression> for Expression {
-    fn sub_assign(&mut self, other: &Expression) {
-        *self += &-other.clone();
+impl<T: Into<Expression>> SubAssign<T> for Expression {
+    fn sub_assign(&mut self, other: T) {
+        *self += &-other.into();
     }
 }
-impl SubAssign for Expression {
-    fn sub_assign(&mut self, other: Expression) {
-        *self -= &other
-    }
-}
-impl Sub for Expression {
+impl<T: Into<Expression>> Sub<T> for Expression {
     type Output = Expression;
-    fn sub(mut self, rhs: Expression) -> Self::Output {
+    fn sub(mut self, rhs: T) -> Self::Output {
         self -= rhs;
         self
     }
 }
-impl Sub<&Expression> for Expression {
+impl<T: Into<Expression>> Sub<T> for &Expression {
     type Output = Expression;
-    fn sub(self, rhs: &Expression) -> Self::Output {
-        self - rhs.clone()
-    }
-}
-impl Sub for &Expression {
-    type Output = Expression;
-    fn sub(self, rhs: &Expression) -> Self::Output {
-        self.clone() - rhs.clone()
-    }
-}
-impl Sub<Expression> for &Expression {
-    type Output = Expression;
-    fn sub(self, rhs: Expression) -> Self::Output {
+    fn sub(self, rhs: T) -> Self::Output {
         self.clone() - rhs
     }
 }
-
 /// represents <=
 #[allow(clippy::suspicious_arithmetic_impl)]
-impl Shl for Expression {
+impl<T: Into<Expression>> Shl<T> for Expression {
     type Output = Inequality;
-    fn shl(self, rhs: Self) -> Self::Output {
+    fn shl(self, rhs: T) -> Self::Output {
         Inequality(self - rhs)
     }
 }
 /// represents <=
 #[allow(clippy::suspicious_arithmetic_impl)]
-impl Shl<&Expression> for Expression {
+impl<T: Into<Expression>> Shl<T> for &Expression {
     type Output = Inequality;
-    fn shl(self, rhs: &Expression) -> Self::Output {
+    fn shl(self, rhs: T) -> Self::Output {
         Inequality(self - rhs)
     }
 }
-/// represents <=
-#[allow(clippy::suspicious_arithmetic_impl)]
-impl Shl for &Expression {
-    type Output = Inequality;
-    fn shl(self, rhs: Self) -> Self::Output {
-        Inequality(self - rhs)
-    }
-}
-/// represents <=
-#[allow(clippy::suspicious_arithmetic_impl)]
-impl Shl<Expression> for &Expression {
-    type Output = Inequality;
-    fn shl(self, rhs: Expression) -> Self::Output {
-        Inequality(self - rhs)
-    }
-}
-
 /// represents >=
 #[allow(clippy::suspicious_arithmetic_impl)]
-impl Shr for Expression {
+impl<T: Into<Expression>> Shr<T> for Expression {
     type Output = Inequality;
-    fn shr(self, rhs: Self) -> Self::Output {
-        Inequality(rhs - self)
+    fn shr(self, rhs: T) -> Self::Output {
+        Inequality(rhs.into() - self)
     }
 }
 /// represents >=
 #[allow(clippy::suspicious_arithmetic_impl)]
-impl Shr<&Expression> for Expression {
+impl<T: Into<Expression>> Shr<T> for &Expression {
     type Output = Inequality;
-    fn shr(self, rhs: &Expression) -> Self::Output {
-        Inequality(rhs - self)
-    }
-}
-/// represents >=
-#[allow(clippy::suspicious_arithmetic_impl)]
-impl Shr for &Expression {
-    type Output = Inequality;
-    fn shr(self, rhs: Self) -> Self::Output {
-        Inequality(rhs - self)
-    }
-}
-/// represents >=
-#[allow(clippy::suspicious_arithmetic_impl)]
-impl Shr<Expression> for &Expression {
-    type Output = Inequality;
-    fn shr(self, rhs: Expression) -> Self::Output {
-        Inequality(rhs - self)
+    fn shr(self, rhs: T) -> Self::Output {
+        Inequality(rhs.into() - self)
     }
 }
 
@@ -265,21 +201,27 @@ pub struct Inequality(Expression);
 
 /// information on a single variable for the LP model
 #[derive(Clone)]
-struct VariableInfo {
+pub struct VariableInfo {
     /// minimum value the variable can take
-    lb: f64,
+    pub lb: f64,
     /// maximum value the variable can take
-    ub: f64,
+    pub ub: f64,
     /// wether the variable should be restricted integers or not
-    integer: bool,
+    pub integer: bool,
     /// variable name
-    name: String,
+    pub name: String,
 }
 #[derive(Clone)]
 pub struct ModelBuilder {
-    variables: Vec<VariableInfo>,
-    constraints: Vec<Inequality>,
+    pub variables: Vec<VariableInfo>,
+    pub constraints: Vec<Inequality>,
 }
+impl Default for ModelBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ModelBuilder {
     pub fn new() -> Self {
         Self {
@@ -355,10 +297,8 @@ mod tests {
         for i in 0..10 {
             x.push(mb.add_var(0.0, 1.0, true, format!("x{}", i)));
         }
-        mb.add_constraint(
-            5.0*(-3*&x[0] + 2*&x[1]) + &x[4] - &x[5] + Expression::cons(2.0) << Expression::cons(3.0),
-        );
-        mb.add_constraint(x.iter().fold(Expression::cons(0.0), |acc,item| acc+item)>>Expression::cons(2.0));
+        mb.add_constraint((5.1 * (-3 * &x[0] + 2 * &x[1]) + &x[4] - &x[5] + 2) << 3);
+        mb.add_constraint(x.iter().fold(Expression::cons(0.0), |acc, item| acc + item) >> 2);
         eprintln!("{:?}", mb);
     }
 }
