@@ -33,21 +33,16 @@ impl<P: Problem, N: neighbour_space::NeighbourSpace<P>, R: rng::Rng, CS: Cooling
     fn solve<T: stop_condition::Timer, S: stop_condition::StopCondition<P::Obj>>(
         &mut self,
         p: P,
-        timer: T,
         mut stop: S,
-    ) -> (Option<P::Solution>, Vec<SolverEvent<P>>) {
-        let start_time = timer.time();
+    ) -> (Option<P::Solution>, SolverStats<T, P>) {
+        let mut stats = SolverStats::new();
         let neighbour_space = N::from(&p);
-        let mut events = Vec::new();
         let mut current_solution = neighbour_space.to_node(&self.initial_solution);
         let mut current_obj = neighbour_space.eval(&current_solution);
         let mut best_solution = current_solution.clone();
         let mut best_obj = current_obj;
-        events.push(SolverEvent {
-            time: timer.time() - start_time,
-            primal_bound: best_obj,
-            dual_bound: P::Obj::unbounded(),
-        });
+        stats.iter();
+        stats.add_primal_bound(best_obj);
         loop {
             if stop.stop(best_obj, P::Obj::unbounded()) {
                 break;
@@ -62,14 +57,10 @@ impl<P: Problem, N: neighbour_space::NeighbourSpace<P>, R: rng::Rng, CS: Cooling
                 if current_obj < best_obj {
                     best_solution = current_solution.clone();
                     best_obj = current_obj;
-                    events.push(SolverEvent {
-                        time: timer.time() - start_time,
-                        primal_bound: best_obj,
-                        dual_bound: P::Obj::unbounded(),
-                    });
+                    stats.add_primal_bound(best_obj);
                 }
             }
         }
-        (Some(neighbour_space.to_solution(&best_solution)), events)
+        (Some(neighbour_space.to_solution(&best_solution)), stats)
     }
 }

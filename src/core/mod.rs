@@ -35,11 +35,73 @@ pub trait ProblemGenerator<P: Problem> {
     fn generate<R: rng::Rng>(rng: &mut R) -> P;
 }
 
-pub struct SolverEvent<P: Problem> {
-    pub time: std::time::Duration,
+pub struct SolverEvent<T: Timer, P: Problem> {
+    pub time: T::Instant,
     pub primal_bound: P::Obj,
     pub dual_bound: P::Obj,
 }
+pub struct SolverStats<T: Timer, P: Problem> {
+    pub its: u64,
+    pub events: Vec<SolverEvent<T, P>>,
+    pub start_time: T::Instant,
+    pub end_time: Option<T::Instant>,
+    pub timer: T,
+}
+impl<T: Timer, P: Problem> Default for SolverStats<T, P> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<T: Timer, P: Problem> SolverStats<T, P> {
+    pub fn duration(&self) -> Option<std::time::Duration> {
+        self.end_time.map(|x| x - self.start_time)
+    }
+    pub fn new() -> Self {
+        let timer = T::default();
+        Self {
+            its: 0,
+            events: Vec::new(),
+            start_time: timer.time(),
+            end_time: None,
+            timer,
+        }
+    }
+    pub fn add_primal_bound(&mut self, pb: P::Obj) {
+        self.events.push(SolverEvent {
+            time: self.timer.time(),
+            primal_bound: pb,
+            dual_bound: self
+                .events
+                .last()
+                .map_or(P::Obj::unbounded(), |x| x.dual_bound),
+        });
+    }
+    pub fn add_dual_bound(&mut self, db: P::Obj) {
+        self.events.push(SolverEvent {
+            time: self.timer.time(),
+            primal_bound: self
+                .events
+                .last()
+                .map_or(P::Obj::unbounded(), |x| x.primal_bound),
+            dual_bound: db,
+        });
+    }
+    pub fn add_bounds(&mut self, pb: P::Obj, db: P::Obj) {
+        self.events.push(SolverEvent {
+            time: self.timer.time(),
+            primal_bound: pb,
+            dual_bound: db,
+        });
+    }
+    pub fn iter(&mut self) {
+        self.its += 1;
+    }
+    pub fn finish(&mut self) {
+        self.end_time = Some(self.timer.time());
+    }
+}
+
 /// Represents a solver for a problem
 pub trait Solver<P: Problem> {
     // TODO: also return a list of primal/dual bounds with their timestamps, add stopping
@@ -47,7 +109,6 @@ pub trait Solver<P: Problem> {
     fn solve<T: Timer, S: StopCondition<P::Obj>>(
         &mut self,
         p: P,
-        timer: T,
         stop: S,
-    ) -> (Option<P::Solution>, Vec<SolverEvent<P>>);
+    ) -> (Option<P::Solution>, SolverStats<T, P>);
 }
