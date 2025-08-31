@@ -19,10 +19,12 @@ impl Expression {
             variables: vec![],
         }
     }
-    pub fn from_var_id(id: usize) -> Self {
+}
+impl From<VariableId> for Expression {
+    fn from(vid: VariableId) -> Self {
         Self {
             constant: 0f64,
-            variables: vec![(id, 1f64)],
+            variables: vec![(vid.0, 1f64)],
         }
     }
 }
@@ -195,6 +197,43 @@ impl<T: Into<Expression>> Shr<T> for &Expression {
     }
 }
 
+impl<T: Into<f64> + Copy> Mul<T> for VariableId {
+    type Output = Expression;
+    fn mul(self, rhs: T) -> Self::Output {
+        Into::<Expression>::into(self) * rhs
+    }
+}
+impl Mul<VariableId> for f64 {
+    type Output = Expression;
+    fn mul(self, rhs: VariableId) -> Expression {
+        Into::<Expression>::into(rhs) * self
+    }
+}
+impl Mul<VariableId> for i64 {
+    type Output = Expression;
+    fn mul(self, rhs: VariableId) -> Expression {
+        self * Into::<Expression>::into(rhs)
+    }
+}
+impl<T: Into<Expression>> Add<T> for VariableId {
+    type Output = Expression;
+    fn add(self, rhs: T) -> Self::Output {
+        Into::<Expression>::into(self) + rhs
+    }
+}
+impl<T: Into<Expression>> Sub<T> for VariableId {
+    type Output = Expression;
+    fn sub(self, rhs: T) -> Self::Output {
+        Into::<Expression>::into(self) - rhs
+    }
+}
+impl Neg for VariableId {
+    type Output = Expression;
+    fn neg(self) -> Self::Output {
+        -Into::<Expression>::into(self)
+    }
+}
+
 /// corresponds to: sum of constant and all variables in the expression <= 0
 #[derive(Clone)]
 pub struct Inequality(Expression);
@@ -215,31 +254,43 @@ pub struct VariableInfo {
 pub struct ModelBuilder {
     pub variables: Vec<VariableInfo>,
     pub constraints: Vec<Inequality>,
+    next_variable_id: usize,
+    next_constraint_id: usize,
 }
 impl Default for ModelBuilder {
     fn default() -> Self {
         Self::new()
     }
 }
-
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct VariableId(usize);
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct ConstraintId(usize);
 impl ModelBuilder {
     pub fn new() -> Self {
         Self {
             variables: vec![],
             constraints: vec![],
+            next_variable_id: 0,
+            next_constraint_id: 0,
         }
     }
-    pub fn add_var(&mut self, lb: f64, ub: f64, integer: bool, name: String) -> Expression {
+    pub fn add_var(&mut self, lb: f64, ub: f64, integer: bool, name: String) -> VariableId {
         self.variables.push(VariableInfo {
             lb,
             ub,
             integer,
             name,
         });
-        Expression::from_var_id(self.variables.len() - 1)
+        let ret = VariableId(self.next_variable_id);
+        self.next_variable_id += 1;
+        ret
     }
-    pub fn add_constraint(&mut self, constraint: Inequality) {
+    pub fn add_constraint(&mut self, constraint: Inequality) -> ConstraintId {
         self.constraints.push(constraint);
+        let ret = ConstraintId(self.next_constraint_id);
+        self.next_constraint_id += 1;
+        ret
     }
     pub fn fmt_var(&self, id: usize, f: &mut Formatter<'_>) -> Result<(), fmt::Error> {
         if self.variables[id].name.is_empty() {
@@ -293,12 +344,16 @@ mod tests {
     #[test]
     fn usage() {
         let mut mb = ModelBuilder::new();
-        let mut x = Vec::<Expression>::new();
+        let mut x = Vec::<VariableId>::new();
         for i in 0..10 {
             x.push(mb.add_var(0.0, 1.0, true, format!("x{}", i)));
         }
-        mb.add_constraint((5.1 * (-3 * &x[0] + 2 * &x[1]) + &x[4] - &x[5] + 2) << 3);
-        mb.add_constraint(x.iter().fold(Expression::cons(0.0), |acc, item| acc + item) >> 2);
+        mb.add_constraint((5.1 * (-3 * x[0] + 2 * x[1]) + x[4] - x[5] + 2) << 3);
+        mb.add_constraint(
+            x.into_iter()
+                .fold(Expression::cons(0.0), |acc, item| acc + item)
+                >> 2,
+        );
         eprintln!("{:?}", mb);
     }
 }
