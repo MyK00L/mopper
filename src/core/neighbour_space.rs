@@ -44,5 +44,3 @@ pub trait NeighbourSpace<P: Problem>: From<P> {
         neigh.into_iter()
     }
 }
-
-

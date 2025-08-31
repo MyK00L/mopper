@@ -1,7 +1,7 @@
+pub mod neighbour_space;
 pub mod rng;
 pub mod stop_condition;
 pub mod tree_space;
-pub mod neighbour_space;
 
 use std::fmt::Debug;
 
