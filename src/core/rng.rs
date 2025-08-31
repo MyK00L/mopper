@@ -1,5 +1,5 @@
 /// Trait for random number generation
-pub trait Rng {
+pub trait Rng: Clone {
     fn next_u64(&mut self) -> u64;
     #[allow(clippy::should_implement_trait)]
     fn next<T: From<u64>>(&mut self) -> T {
@@ -10,6 +10,7 @@ pub trait Rng {
     }
 }
 /// The actual random number generator
+#[derive(Clone, Copy)]
 pub struct Splitmix64(u64);
 impl Splitmix64 {
     pub fn from_u64(seed: u64) -> Self {
