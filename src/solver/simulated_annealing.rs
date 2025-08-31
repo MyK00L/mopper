@@ -5,9 +5,9 @@ pub trait CoolingSchedule {
 }
 
 pub struct SimulatedAnnealing<
-    P: crate::core::Problem,
-    N: crate::core::neighbour_space::NeighbourSpace<P>,
-    R: crate::core::rng::Rng,
+    P: Problem,
+    N: neighbour_space::NeighbourSpace<P>,
+    R: rng::Rng,
     CS: CoolingSchedule,
 > {
     initial_solution: P::Solution,
@@ -15,12 +15,8 @@ pub struct SimulatedAnnealing<
     cooling_schedule: CS,
     _n: std::marker::PhantomData<N>,
 }
-impl<
-        P: crate::core::Problem,
-        N: crate::core::neighbour_space::NeighbourSpace<P>,
-        R: crate::core::rng::Rng,
-        CS: CoolingSchedule,
-    > SimulatedAnnealing<P, N, R, CS>
+impl<P: Problem, N: neighbour_space::NeighbourSpace<P>, R: rng::Rng, CS: CoolingSchedule>
+    SimulatedAnnealing<P, N, R, CS>
 {
     pub fn new(initial_solution: P::Solution, rng: R, cooling_schedule: CS) -> Self {
         Self {
@@ -31,22 +27,15 @@ impl<
         }
     }
 }
-impl<
-        P: crate::core::Problem,
-        N: crate::core::neighbour_space::NeighbourSpace<P>,
-        R: crate::core::rng::Rng,
-        CS: CoolingSchedule,
-    > crate::core::Solver<P> for SimulatedAnnealing<P, N, R, CS>
+impl<P: Problem, N: neighbour_space::NeighbourSpace<P>, R: rng::Rng, CS: CoolingSchedule> Solver<P>
+    for SimulatedAnnealing<P, N, R, CS>
 {
-    fn solve<
-        T: crate::core::stop_condition::Timer,
-        S: crate::core::stop_condition::StopCondition<P::Obj>,
-    >(
+    fn solve<T: stop_condition::Timer, S: stop_condition::StopCondition<P::Obj>>(
         &mut self,
         p: P,
         timer: T,
         mut stop: S,
-    ) -> (Option<P::Solution>, Vec<crate::core::SolverEvent<P>>) {
+    ) -> (Option<P::Solution>, Vec<SolverEvent<P>>) {
         let start_time = timer.time();
         let neighbour_space = N::from(&p);
         let mut events = Vec::new();
@@ -54,7 +43,7 @@ impl<
         let mut current_obj = neighbour_space.eval(&current_solution);
         let mut best_solution = current_solution.clone();
         let mut best_obj = current_obj;
-        events.push(crate::core::SolverEvent {
+        events.push(SolverEvent {
             time: timer.time() - start_time,
             primal_bound: best_obj,
             dual_bound: P::Obj::unbounded(),
@@ -73,7 +62,7 @@ impl<
                 if current_obj < best_obj {
                     best_solution = current_solution.clone();
                     best_obj = current_obj;
-                    events.push(crate::core::SolverEvent {
+                    events.push(SolverEvent {
                         time: timer.time() - start_time,
                         primal_bound: best_obj,
                         dual_bound: P::Obj::unbounded(),
