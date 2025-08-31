@@ -22,6 +22,7 @@ pub trait NeighbourSpace<P: Problem> {
         neigh.sort_by_key(|x| x.0);
         neigh.into_iter()
     }
+    fn from(p: &P) -> Self;
 }
 
 pub struct ChainedNeighbourSpace<P: Problem, NS1: NeighbourSpace<P>, NS2: NeighbourSpace<P>>
@@ -92,6 +93,13 @@ where
     }
     fn eval_neighbour(&self, _n: &Self::Node, nid: &Self::NeighbourId) -> P::Obj {
         self.ns1.eval(nid)
+    }
+    fn from(p: &P) -> Self {
+        ChainedNeighbourSpace {
+            ns1: NS1::from(p),
+            ns2: NS2::from(p),
+            _p: std::marker::PhantomData,
+        }
     }
 }
 
@@ -174,6 +182,13 @@ where
                 let s2: NS2::Node = n.clone().into();
                 self.ns2.eval_neighbour(&s2, nid2)
             }
+        }
+    }
+    fn from(p: &P) -> Self {
+        CombinedNeighbourSpace {
+            ns1: NS1::from(p),
+            ns2: NS2::from(p),
+            _p: std::marker::PhantomData,
         }
     }
 }

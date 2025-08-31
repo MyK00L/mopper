@@ -3,7 +3,7 @@ use std::ops::{Add, Sub};
 use crate::core::Objective;
 
 /// timer trait to use as stopping conditions for solvers
-pub trait Timer: Clone {
+pub trait Timer: Clone + Default {
     type Instant: Sub<Output = std::time::Duration>
         + Add<std::time::Duration, Output = Self::Instant>
         + Ord
@@ -11,7 +11,7 @@ pub trait Timer: Clone {
     fn time(&self) -> Self::Instant;
 }
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct RdtscTimer<const TICKS_PER_SEC: u64>;
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -46,7 +46,7 @@ impl<const TICKS_PER_SEC: u64> Timer for RdtscTimer<TICKS_PER_SEC> {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct StdTimer;
 impl Timer for StdTimer {
     type Instant = std::time::Instant;

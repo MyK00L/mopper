@@ -13,4 +13,16 @@ pub trait TreeSpace<P: Problem> {
     fn primal_bound(&self, n: &Self::Node) -> P::Obj;
     fn dual_bound(&self, n: &Self::Node, primal: P::Obj) -> P::Obj;
     fn to_solution(&self, n: &Self::Node) -> Option<P::Solution>;
+    /// Returns an iterator over children ordered by their dual bounds (best first)
+    fn children_ord(&self, n: &Self::Node) -> impl Iterator<Item = (P::Obj, Self::ChildId)> {
+        let mut ch: Vec<(P::Obj, Self::ChildId)> = self
+            .children(n)
+            .map(|cid| {
+                let db = self.child_dual_bound(n, &cid, self.primal_bound(n));
+                (db, cid)
+            })
+            .collect();
+        ch.sort_by(|(db1, _), (db2, _)| db1.cmp(db2));
+        ch.into_iter()
+    }
 }

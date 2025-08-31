@@ -1,10 +1,6 @@
 /// Trait for random number generation
 pub trait Rng: Clone {
     fn next_u64(&mut self) -> u64;
-    #[allow(clippy::should_implement_trait)]
-    fn next<T: From<u64>>(&mut self) -> T {
-        self.next_u64().into()
-    }
     fn next01(&mut self) -> f64 {
         self.next_u64() as f64 / u64::MAX as f64
     }

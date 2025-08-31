@@ -35,8 +35,8 @@ pub trait ProblemGenerator<P: Problem> {
     fn generate<R: rng::Rng>(rng: &mut R) -> P;
 }
 
-pub struct SolverEvent<P: Problem, T: Timer> {
-    pub time: T::Instant,
+pub struct SolverEvent<P: Problem> {
+    pub time: std::time::Duration,
     pub primal_bound: P::Obj,
     pub dual_bound: P::Obj,
 }
@@ -49,5 +49,5 @@ pub trait Solver<P: Problem> {
         p: P,
         timer: T,
         stop: S,
-    ) -> (Option<P::Solution>, Vec<SolverEvent<P, T>>);
+    ) -> (Option<P::Solution>, Vec<SolverEvent<P>>);
 }
