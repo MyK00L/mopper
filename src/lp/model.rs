@@ -262,6 +262,9 @@ impl Default for ModelBuilder {
         Self::new()
     }
 }
+
+// TODO: use variable and constraint id to remove variable/constraints,
+// add solving interface
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct VariableId(usize);
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -324,7 +327,7 @@ impl ModelBuilder {
     }
     pub fn fmt_ineq(&self, ineq: &Inequality, f: &mut Formatter<'_>) -> Result<(), fmt::Error> {
         self.fmt_expr(&ineq.0, f)?;
-        write!(f, " <= 0")
+        write!(f, " ≤ 0")
     }
 }
 impl Debug for ModelBuilder {
