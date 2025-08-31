@@ -10,6 +10,7 @@ pub trait TreeSpaceDirect<P: Problem> {
     fn children(&self, n: &Self::Node) -> impl Iterator<Item = Self::Node>;
     fn primal_bound(&self, n: &Self::Node) -> P::Obj;
     fn dual_bound(&self, n: &Self::Node, primal: P::Obj) -> P::Obj;
+    fn to_solution(&self, n: &Self::Node) -> Option<P::Solution>;
 }
 
 /// Represents a search space that divides the problem into subproblems
@@ -22,6 +23,7 @@ pub trait TreeSpaceIndirect<P: Problem> {
     fn child(&self, n: &Self::Node, cid: &Self::ChildId) -> Self::Node;
     fn child_primal_bound(&self, n: &Self::Node, cid: &Self::ChildId) -> P::Obj;
     fn child_dual_bound(&self, n: &Self::Node, cid: &Self::ChildId, primal: P::Obj) -> P::Obj;
+    fn to_solution(&self, n: &Self::Node) -> Option<P::Solution>;
 }
 
 // back end traits
@@ -38,6 +40,7 @@ pub trait TreeSpaceBackend<P: Problem> {
     fn dual_bound(&self, n: &Self::Node, primal: P::Obj) -> P::Obj;
     fn child_primal_bound(&self, n: &Self::Node, cid: &Self::ChildId) -> P::Obj;
     fn child_dual_bound(&self, n: &Self::Node, cid: &Self::ChildId, primal: P::Obj) -> P::Obj;
+    fn to_solution(&self, n: &Self::Node) -> Option<P::Solution>;
 }
 
 // Newtype wrappers to avoid conflicting trait implementations
@@ -67,6 +70,9 @@ impl<P: Problem, T: TreeSpaceDirect<P>> TreeSpaceBackend<P> for TreeSpaceDirectW
     }
     fn child_dual_bound(&self, _n: &Self::Node, cid: &Self::ChildId, primal: P::Obj) -> P::Obj {
         self.0.dual_bound(cid, primal)
+    }
+    fn to_solution(&self, n: &Self::Node) -> Option<P::Solution> {
+        self.0.to_solution(n)
     }
 }
 
@@ -110,5 +116,8 @@ impl<P: Problem, T: TreeSpaceIndirect<P>> TreeSpaceBackend<P> for TreeSpaceindir
     fn child_primal_bound(&self, n: &Self::Node, cid: &Self::ChildId) -> <P as Problem>::Obj {
         cid.1
             .unwrap_or_else(|| self.0.child_primal_bound(&n.0, &cid.0))
+    }
+    fn to_solution(&self, n: &Self::Node) -> Option<P::Solution> {
+        self.0.to_solution(&n.0)
     }
 }
