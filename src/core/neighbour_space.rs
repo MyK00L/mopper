@@ -7,7 +7,8 @@ pub trait NeighbourSpace<P: Problem> {
     fn to_node(&self, sol: &P::Solution) -> Self::Node;
     fn random_neighbour<R: rng::Rng>(&self, n: &Self::Node, rng: &mut R) -> Self::NeighbourId;
     fn neighbourhood(&self, n: &Self::Node) -> impl Iterator<Item = Self::NeighbourId>;
-    fn neighbour(&self, n: &Self::Node, nid: Self::NeighbourId) -> Self::Node;
+    /// returns the corresponding neighbour, consumes the current node
+    fn neighbour(&self, n: Self::Node, nid: Self::NeighbourId) -> Self::Node;
     fn eval(&self, n: &Self::Node) -> P::Obj;
     fn eval_neighbour(&self, n: &Self::Node, nid: &Self::NeighbourId) -> P::Obj;
     /// Returns an iterator to the feasible neighbours from the one with best objective to worst
@@ -62,22 +63,23 @@ where
         self.ns1.to_node(sol)
     }
     fn random_neighbour<R: rng::Rng>(&self, n: &Self::Node, rng: &mut R) -> Self::NeighbourId {
-        let s1 = self.ns1.neighbour(n, self.ns1.random_neighbour(n, rng));
-        let s2 = s1.into();
-        self.ns2
-            .neighbour(&s2, self.ns2.random_neighbour(&s2, rng))
-            .into()
+        let s1 = self
+            .ns1
+            .neighbour(n.clone(), self.ns1.random_neighbour(n, rng));
+        let s2: NS2::Node = s1.into();
+        let s2n = self.ns2.random_neighbour(&s2, rng);
+        self.ns2.neighbour(s2, s2n).into()
     }
     fn neighbourhood(&self, n: &Self::Node) -> impl Iterator<Item = Self::NeighbourId> {
         let n1 = self.ns1.neighbourhood(n).map(move |nid1| {
-            let s1 = self.ns1.neighbour(n, nid1);
+            let s1 = self.ns1.neighbour(n.clone(), nid1);
             let s2: NS2::Node = s1.into();
             self.ns2
                 .neighbourhood(&s2)
                 .map({
                     let value = s2.clone();
                     move |nid2| {
-                        let s3 = self.ns2.neighbour(&value, nid2);
+                        let s3 = self.ns2.neighbour(value.clone(), nid2);
                         s3.into()
                     }
                 })
@@ -85,7 +87,7 @@ where
         });
         n1.flatten()
     }
-    fn neighbour(&self, _n: &Self::Node, nid: Self::NeighbourId) -> Self::Node {
+    fn neighbour(&self, _n: Self::Node, nid: Self::NeighbourId) -> Self::Node {
         nid
     }
     fn eval(&self, n: &Self::Node) -> P::Obj {
@@ -163,12 +165,12 @@ where
             .map(CombinedNeighbourId::Neigh2);
         n1.chain(n2)
     }
-    fn neighbour(&self, n: &Self::Node, nid: Self::NeighbourId) -> Self::Node {
+    fn neighbour(&self, n: Self::Node, nid: Self::NeighbourId) -> Self::Node {
         match nid {
             CombinedNeighbourId::Neigh1(nid1) => self.ns1.neighbour(n, nid1),
             CombinedNeighbourId::Neigh2(nid2) => {
                 let s2: NS2::Node = n.clone().into();
-                self.ns2.neighbour(&s2, nid2).into()
+                self.ns2.neighbour(s2, nid2).into()
             }
         }
     }
