@@ -37,6 +37,7 @@ pub trait ProblemGenerator<P: Problem> {
 
 pub struct SolverEvent<T: Timer, P: Problem> {
     pub time: T::Instant,
+    pub it: u64,
     pub primal_bound: P::Obj,
     pub dual_bound: P::Obj,
 }
@@ -70,6 +71,7 @@ impl<T: Timer, P: Problem> SolverStats<T, P> {
     pub fn add_primal_bound(&mut self, pb: P::Obj) {
         self.events.push(SolverEvent {
             time: self.timer.time(),
+            it: self.its,
             primal_bound: pb,
             dual_bound: self
                 .events
@@ -80,6 +82,7 @@ impl<T: Timer, P: Problem> SolverStats<T, P> {
     pub fn add_dual_bound(&mut self, db: P::Obj) {
         self.events.push(SolverEvent {
             time: self.timer.time(),
+            it: self.its,
             primal_bound: self
                 .events
                 .last()
@@ -90,6 +93,7 @@ impl<T: Timer, P: Problem> SolverStats<T, P> {
     pub fn add_bounds(&mut self, pb: P::Obj, db: P::Obj) {
         self.events.push(SolverEvent {
             time: self.timer.time(),
+            it: self.its,
             primal_bound: pb,
             dual_bound: db,
         });
@@ -98,14 +102,27 @@ impl<T: Timer, P: Problem> SolverStats<T, P> {
         self.its += 1;
     }
     pub fn finish(&mut self) {
+        self.events.push(SolverEvent {
+            time: self.timer.time(),
+            it: self.its,
+            primal_bound: self
+                .events
+                .last()
+                .map_or(P::Obj::unbounded(), |x| x.primal_bound),
+            dual_bound: self
+                .events
+                .last()
+                .map_or(P::Obj::unbounded(), |x| x.dual_bound),
+        });
         self.end_time = Some(self.timer.time());
+    }
+    pub fn total_time(&self) -> Option<std::time::Duration> {
+        self.end_time.map(|et| et - self.start_time)
     }
 }
 
 /// Represents a solver for a problem
 pub trait Solver<P: Problem> {
-    // TODO: also return a list of primal/dual bounds with their timestamps, add stopping
-    // conditions
     fn solve<T: Timer, S: StopCondition<P::Obj>>(
         &mut self,
         p: P,
