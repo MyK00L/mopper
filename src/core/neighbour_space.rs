@@ -3,8 +3,8 @@ use crate::core::*;
 pub trait NeighbourSpace<P: Problem> {
     type Node: Clone + Debug;
     type NeighbourId: Clone + Debug;
-    fn to_solution(&self, n: &Self::Node) -> P::Solution;
-    fn to_node(&self, sol: &P::Solution) -> Self::Node;
+    fn to_solution(&self, n: Self::Node) -> P::Solution;
+    fn to_node(&self, sol: P::Solution) -> Self::Node;
     fn random_neighbour<R: rng::Rng>(&self, n: &Self::Node, rng: &mut R) -> Self::NeighbourId;
     fn neighbourhood(&self, n: &Self::Node) -> impl Iterator<Item = Self::NeighbourId>;
     /// returns the corresponding neighbour, consumes the current node
@@ -56,10 +56,10 @@ where
 {
     type Node = NS1::Node;
     type NeighbourId = NS1::Node;
-    fn to_solution(&self, n: &Self::Node) -> P::Solution {
+    fn to_solution(&self, n: Self::Node) -> P::Solution {
         self.ns1.to_solution(n)
     }
-    fn to_node(&self, sol: &P::Solution) -> Self::Node {
+    fn to_node(&self, sol: P::Solution) -> Self::Node {
         self.ns1.to_node(sol)
     }
     fn random_neighbour<R: rng::Rng>(&self, n: &Self::Node, rng: &mut R) -> Self::NeighbourId {
@@ -140,10 +140,10 @@ where
 {
     type Node = NS1::Node;
     type NeighbourId = CombinedNeighbourId<NS1::NeighbourId, NS2::NeighbourId>;
-    fn to_solution(&self, n: &Self::Node) -> P::Solution {
+    fn to_solution(&self, n: Self::Node) -> P::Solution {
         self.ns1.to_solution(n)
     }
-    fn to_node(&self, sol: &P::Solution) -> Self::Node {
+    fn to_node(&self, sol: P::Solution) -> Self::Node {
         self.ns1.to_node(sol)
     }
     fn random_neighbour<R: rng::Rng>(&self, n: &Self::Node, rng: &mut R) -> Self::NeighbourId {

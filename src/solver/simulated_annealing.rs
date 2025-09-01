@@ -10,7 +10,7 @@ pub struct SimulatedAnnealing<
     R: rng::Rng,
     CS: CoolingSchedule,
 > {
-    initial_solution: P::Solution,
+    initial_solution: Option<P::Solution>,
     rng: R,
     cooling_schedule: CS,
     _n: std::marker::PhantomData<N>,
@@ -20,7 +20,7 @@ impl<P: Problem, N: neighbour_space::NeighbourSpace<P>, R: rng::Rng, CS: Cooling
 {
     pub fn new(initial_solution: P::Solution, rng: R, cooling_schedule: CS) -> Self {
         Self {
-            initial_solution,
+            initial_solution: Some(initial_solution),
             rng,
             cooling_schedule,
             _n: std::marker::PhantomData,
@@ -37,16 +37,16 @@ impl<P: Problem, N: neighbour_space::NeighbourSpace<P>, R: rng::Rng, CS: Cooling
     ) -> (Option<P::Solution>, SolverStats<T, P>) {
         let mut stats = SolverStats::new();
         let neighbour_space = N::from(&p);
-        let mut current_solution = neighbour_space.to_node(&self.initial_solution);
+        let mut current_solution = neighbour_space.to_node(self.initial_solution.take().unwrap());
         let mut current_obj = neighbour_space.eval(&current_solution);
         let mut best_solution = current_solution.clone();
         let mut best_obj = current_obj;
-        stats.iter();
         stats.add_primal_bound(best_obj);
         loop {
             if stop.stop(best_obj, P::Obj::unbounded()) {
                 break;
             }
+            stats.iter();
             let temp = self.cooling_schedule.temperature(current_obj.into());
             if temp <= 0.0 {
                 break;
@@ -64,7 +64,7 @@ impl<P: Problem, N: neighbour_space::NeighbourSpace<P>, R: rng::Rng, CS: Cooling
                 }
             }
         }
-        (Some(neighbour_space.to_solution(&best_solution)), stats)
+        (Some(neighbour_space.to_solution(best_solution)), stats)
     }
 }
 
