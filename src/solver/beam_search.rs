@@ -76,7 +76,7 @@ impl<P: Problem, TS: TreeSpace<P>> Solver<P> for BeamSearch<P, TS> {
                     }
                     next_beam.add(db, i, cid);
                 }
-                if let Some(obj) = ts.primal_bound(n) {
+                if let Some(obj) = ts.objective(n) {
                     if obj < best_obj {
                         best_obj = obj;
                         best_sol = ts.to_solution(n);
