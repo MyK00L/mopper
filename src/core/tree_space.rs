@@ -1,5 +1,7 @@
 use crate::core::*;
 
+// TODO: separate TreeSpace into more traits like for Neighbourhood(?)
+
 /// Represents a search space that divides the problem into subproblems
 pub trait TreeSpace<P: Problem> {
     /// A subproblem
@@ -27,7 +29,7 @@ pub trait TreeSpace<P: Problem> {
     /// Returns the objective value of the solution represented by this node, only if it is a leaf
     fn objective(&self, n: &Self::Node) -> Option<P::Obj>;
     /// Converts a leaf node to a solution
-    fn to_solution(&self, n: &Self::Node) -> Option<P::Solution>;
+    fn to_solution(&self, n: &Self::Node) -> Option<P::Sol>;
     /// Returns an iterator over children ordered by their dual bounds (best first)
     fn children_ord(&self, n: &Self::Node) -> impl Iterator<Item = (P::Obj, Self::ChildId)> {
         let mut ch: Vec<(P::Obj, Self::ChildId)> = self

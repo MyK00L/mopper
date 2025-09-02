@@ -10,7 +10,7 @@ pub use crate::core::stop_condition::*;
 
 /// Represents the trait for the type of the objective,
 /// will always deal with minimization problems
-/// unbounded < best <= value <= worst < unfeas
+/// unbounded < any other value < unfeas
 pub trait Objective: Clone + Copy + Debug + PartialOrd + Ord + Into<f64> {
     /// returns a value that represents an unfeasible objective
     fn unfeas() -> Self;
@@ -24,10 +24,18 @@ pub trait Objective: Clone + Copy + Debug + PartialOrd + Ord + Into<f64> {
 
 /// Represents a problem
 pub trait Problem: Clone + Debug {
-    type Solution: Clone + Debug;
+    /// Solution space
+    type Sol: Clone + Debug;
     type Obj: Objective;
-    fn objective(&self, sol: &Self::Solution) -> Self::Obj;
-    fn is_feasible(&self, sol: &Self::Solution) -> bool;
+    /// function to minimize
+    fn obj(&self, sol: &Self::Sol) -> Self::Obj;
+    /// should return false iff f returns unfeas
+    fn is_feasible(&self, sol: &Self::Sol) -> bool;
+}
+
+pub trait Reduction<P: Problem>: Problem {
+    fn reduce_from(&self, p: &P) -> Self;
+    fn lift_solution_to(&self, sol: Self::Sol) -> P::Sol;
 }
 
 /// Represents a generator for a problem with a certain distribution
@@ -35,115 +43,106 @@ pub trait ProblemGenerator<P: Problem> {
     fn generate<R: rng::Rng>(rng: &mut R) -> P;
 }
 
+/// Used both to pass solutions to a solver
+/// and to retrieve solutions from it
+pub trait SolutionKeeper<P: Problem> {
+    /// should be called every time a new solution is found, even if worse
+    fn add_solution<F: FnOnce() -> P::Sol>(&mut self, sol_fn: F, obj: P::Obj);
+    /// should be called every time a new global dual bound is found, even if worse
+    fn add_dual_bound(&mut self, db: P::Obj);
+    /// should be called at each iteration of the solver
+    fn iter(&mut self);
+    /// returns the best solution found so far, if any
+    fn best_solution(&self) -> Option<(P::Sol, P::Obj)>;
+}
+
+pub struct SimpleSolutionKeeper<P: Problem> {
+    pub best_sol: Option<(P::Sol, P::Obj)>,
+    pub dual_bound: P::Obj,
+}
+impl<P: Problem> SolutionKeeper<P> for SimpleSolutionKeeper<P> {
+    fn add_solution<F: FnOnce() -> P::Sol>(&mut self, sol_fn: F, obj: P::Obj) {
+        if obj < self.best_sol.as_ref().map_or(P::Obj::unbounded(), |x| x.1) {
+            self.best_sol = Some((sol_fn(), obj));
+        }
+    }
+    fn add_dual_bound(&mut self, db: P::Obj) {
+        if db > self.dual_bound {
+            self.dual_bound = db;
+        }
+    }
+    fn best_solution(&self) -> Option<(P::Sol, P::Obj)> {
+        self.best_sol.clone()
+    }
+    fn iter(&mut self) {}
+}
+impl<P: Problem> Default for SimpleSolutionKeeper<P> {
+    fn default() -> Self {
+        Self {
+            best_sol: None,
+            dual_bound: P::Obj::unbounded(),
+        }
+    }
+}
+
 pub struct SolverEvent<T: Timer, P: Problem> {
     pub time: T::Instant,
     pub it: u64,
-    pub primal_bound: P::Obj,
-    pub dual_bound: P::Obj,
+    pub primal_bound: Option<(P::Sol, P::Obj)>,
+    pub dual_bound: Option<P::Obj>,
 }
-pub struct SolverStats<T: Timer, P: Problem> {
+pub struct SolverStats<T: Timer, P: Problem, SK: SolutionKeeper<P>> {
     pub its: u64,
     pub events: Vec<SolverEvent<T, P>>,
     pub start_time: T::Instant,
-    pub end_time: Option<T::Instant>,
+    pub last_time: T::Instant,
     pub timer: T,
+    pub underlying: SK,
 }
-impl<T: Timer, P: Problem> Default for SolverStats<T, P> {
-    fn default() -> Self {
-        Self::new()
+impl<T: Timer, P: Problem, SK: SolutionKeeper<P>> SolutionKeeper<P> for SolverStats<T, P, SK> {
+    fn add_solution<F: FnOnce() -> P::Sol>(&mut self, sol_fn: F, obj: P::Obj) {
+        let sol = sol_fn();
+        self.events.push(SolverEvent {
+            time: self.timer.time(),
+            it: self.its,
+            primal_bound: Some((sol.clone(), obj)),
+            dual_bound: None,
+        });
+        self.underlying.add_solution(|| sol, obj);
+    }
+    fn add_dual_bound(&mut self, db: P::Obj) {
+        self.events.push(SolverEvent {
+            time: self.timer.time(),
+            it: self.its,
+            primal_bound: None,
+            dual_bound: Some(db),
+        });
+        self.underlying.add_dual_bound(db);
+    }
+    fn best_solution(&self) -> Option<(P::Sol, P::Obj)> {
+        self.underlying.best_solution()
+    }
+    fn iter(&mut self) {
+        self.its += 1;
+        self.last_time = self.timer.time();
+        self.underlying.iter();
     }
 }
-impl<T: Timer, P: Problem> SolverStats<T, P> {
-    pub fn duration(&self) -> Option<std::time::Duration> {
-        self.end_time.map(|x| x - self.start_time)
-    }
-    pub fn new() -> Self {
+impl<T: Timer, P: Problem, SK: SolutionKeeper<P>> SolverStats<T, P, SK> {
+    pub fn new(underlying: SK) -> Self {
         let timer = T::default();
         Self {
             its: 0,
             events: Vec::new(),
             start_time: timer.time(),
-            end_time: None,
+            last_time: timer.time(),
             timer,
+            underlying,
         }
-    }
-    pub fn primal_bound(&self) -> P::Obj {
-        self.events
-            .last()
-            .map(|e| e.primal_bound)
-            .unwrap_or_else(P::Obj::unfeas)
-    }
-    pub fn dual_bound(&self) -> P::Obj {
-        self.events
-            .last()
-            .map(|e| e.dual_bound)
-            .unwrap_or_else(P::Obj::unbounded)
-    }
-    pub fn add_primal_bound(&mut self, pb: P::Obj) {
-        if pb < self.primal_bound() {
-            self.events.push(SolverEvent {
-                time: self.timer.time(),
-                it: self.its,
-                primal_bound: pb,
-                dual_bound: self
-                    .events
-                    .last()
-                    .map_or(P::Obj::unbounded(), |x| x.dual_bound),
-            });
-        }
-    }
-    pub fn add_dual_bound(&mut self, db: P::Obj) {
-        if db > self.dual_bound() {
-            self.events.push(SolverEvent {
-                time: self.timer.time(),
-                it: self.its,
-                primal_bound: self
-                    .events
-                    .last()
-                    .map_or(P::Obj::unbounded(), |x| x.primal_bound),
-                dual_bound: db,
-            });
-        }
-    }
-    pub fn add_bounds(&mut self, mut pb: P::Obj, mut db: P::Obj) {
-        pb = pb.min(self.primal_bound());
-        db = db.max(self.dual_bound());
-        if pb < self.primal_bound() || db > self.dual_bound() {
-            self.events.push(SolverEvent {
-                time: self.timer.time(),
-                it: self.its,
-                primal_bound: pb,
-                dual_bound: db,
-            });
-        }
-    }
-    pub fn iter(&mut self) {
-        self.its += 1;
-    }
-    pub fn finish(&mut self) {
-        self.events.push(SolverEvent {
-            time: self.timer.time(),
-            it: self.its,
-            primal_bound: self
-                .events
-                .last()
-                .map_or(P::Obj::unbounded(), |x| x.primal_bound),
-            dual_bound: self
-                .events
-                .last()
-                .map_or(P::Obj::unbounded(), |x| x.dual_bound),
-        });
-        self.end_time = Some(self.timer.time());
-    }
-    pub fn total_time(&self) -> Option<std::time::Duration> {
-        self.end_time.map(|et| et - self.start_time)
     }
 }
+
 /// Represents a solver for a problem
-pub trait Solver<P: Problem> {
-    fn solve<T: Timer, S: StopCondition<P::Obj>>(
-        &mut self,
-        p: P,
-        stop: S,
-    ) -> (Option<P::Solution>, SolverStats<T, P>);
+pub trait Solver<P: Problem, SK: SolutionKeeper<P>> {
+    fn solve<T: Timer, S: StopCondition<P::Obj>>(&mut self, p: P, sk: &mut SK, stop: S);
 }
