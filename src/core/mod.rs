@@ -53,7 +53,6 @@ impl<T: Timer, P: Problem> Default for SolverStats<T, P> {
         Self::new()
     }
 }
-
 impl<T: Timer, P: Problem> SolverStats<T, P> {
     pub fn duration(&self) -> Option<std::time::Duration> {
         self.end_time.map(|x| x - self.start_time)
@@ -68,35 +67,55 @@ impl<T: Timer, P: Problem> SolverStats<T, P> {
             timer,
         }
     }
+    pub fn primal_bound(&self) -> P::Obj {
+        self.events
+            .last()
+            .map(|e| e.primal_bound)
+            .unwrap_or_else(P::Obj::unfeas)
+    }
+    pub fn dual_bound(&self) -> P::Obj {
+        self.events
+            .last()
+            .map(|e| e.dual_bound)
+            .unwrap_or_else(P::Obj::unbounded)
+    }
     pub fn add_primal_bound(&mut self, pb: P::Obj) {
-        self.events.push(SolverEvent {
-            time: self.timer.time(),
-            it: self.its,
-            primal_bound: pb,
-            dual_bound: self
-                .events
-                .last()
-                .map_or(P::Obj::unbounded(), |x| x.dual_bound),
-        });
+        if pb < self.primal_bound() {
+            self.events.push(SolverEvent {
+                time: self.timer.time(),
+                it: self.its,
+                primal_bound: pb,
+                dual_bound: self
+                    .events
+                    .last()
+                    .map_or(P::Obj::unbounded(), |x| x.dual_bound),
+            });
+        }
     }
     pub fn add_dual_bound(&mut self, db: P::Obj) {
-        self.events.push(SolverEvent {
-            time: self.timer.time(),
-            it: self.its,
-            primal_bound: self
-                .events
-                .last()
-                .map_or(P::Obj::unbounded(), |x| x.primal_bound),
-            dual_bound: db,
-        });
+        if db > self.dual_bound() {
+            self.events.push(SolverEvent {
+                time: self.timer.time(),
+                it: self.its,
+                primal_bound: self
+                    .events
+                    .last()
+                    .map_or(P::Obj::unbounded(), |x| x.primal_bound),
+                dual_bound: db,
+            });
+        }
     }
-    pub fn add_bounds(&mut self, pb: P::Obj, db: P::Obj) {
-        self.events.push(SolverEvent {
-            time: self.timer.time(),
-            it: self.its,
-            primal_bound: pb,
-            dual_bound: db,
-        });
+    pub fn add_bounds(&mut self, mut pb: P::Obj, mut db: P::Obj) {
+        pb = pb.min(self.primal_bound());
+        db = db.max(self.dual_bound());
+        if pb < self.primal_bound() || db > self.dual_bound() {
+            self.events.push(SolverEvent {
+                time: self.timer.time(),
+                it: self.its,
+                primal_bound: pb,
+                dual_bound: db,
+            });
+        }
     }
     pub fn iter(&mut self) {
         self.its += 1;
@@ -120,7 +139,6 @@ impl<T: Timer, P: Problem> SolverStats<T, P> {
         self.end_time.map(|et| et - self.start_time)
     }
 }
-
 /// Represents a solver for a problem
 pub trait Solver<P: Problem> {
     fn solve<T: Timer, S: StopCondition<P::Obj>>(
