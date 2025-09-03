@@ -78,12 +78,12 @@ impl SingleTestData {
 
 #[derive(Debug, Clone)]
 pub struct AggregatedTestData {
-    name: String,
-    runs: Vec<SingleTestData>,
-    avg_lb: f64,
-    avg_ub: f64,
-    avg_nits: f64,
-    avg_time: Duration,
+    pub name: String,
+    pub runs: Vec<SingleTestData>,
+    pub avg_lb: f64,
+    pub avg_ub: f64,
+    pub avg_nits: f64,
+    pub avg_time: Duration,
 }
 impl AggregatedTestData {
     fn new(name: String, runs: Vec<SingleTestData>) -> Self {
@@ -152,7 +152,12 @@ fn test_solver<
     }
     AggregatedTestData::new(name.to_string(), runs)
 }
-fn test_solver_default<OP: Problem, P: Problem + Reduction<OP>, S: Solver<P>, G: ProblemGenerator<OP>>(
+pub fn test_solver_default<
+    OP: Problem,
+    P: Problem + Reduction<OP>,
+    S: Solver<P>,
+    G: ProblemGenerator<OP>,
+>(
     name: &str,
     solver: S,
     generator: G,
@@ -175,7 +180,8 @@ macro_rules! test_solvers {
         {
             let mut results = Vec::new();
             $(
-                let res = test_solver_default::<$op, $p, _, _>($name, $solver.clone(), $gener.clone(), $time, $number);
+                let res = mopper::testing::test_solver_default::<$op, $p, _, _>($name, $solver.clone(), $gener.clone(), $time, $number);
+                eprintln!("{}\tobj:{}\tit:{}\ttime:{}", res.name, res.avg_lb, res.avg_nits, res.avg_time.as_millis());
                 results.push(res);
             )*
             results

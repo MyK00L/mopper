@@ -56,6 +56,7 @@ impl Timer for StdTimer {
 }
 
 pub type DefaultTimer = StdTimer;
+// TODO: use RdtscTimer instead
 
 /// represent a stopping condition for solvers
 /// could be called many times, so it should be fast to add low overhead
