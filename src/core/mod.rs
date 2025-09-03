@@ -46,8 +46,11 @@ pub trait ProblemGenerator<P: Problem> {
 /// Used both to pass solutions to a solver
 /// and to retrieve solutions from it
 pub trait SolutionKeeper<P: Problem> {
-    /// should be called every time a new solution is found, even if worse
+    /// this or `add_solution_fn` should be called every time a new solution is found, even if worse
     fn add_solution(&mut self, sol: &P::Sol, obj: P::Obj);
+    /// this or `add_solution` should be called every time a new solution is found, even if worse
+    /// useful when the solution is expensive to compute and should be computed only if needed
+    fn add_solution_fn<F: FnOnce() -> P::Sol>(&mut self, f: F, obj: P::Obj);
     /// should be called every time a new global dual bound is found, even if worse
     fn add_dual_bound(&mut self, db: P::Obj);
     /// should be called at each iteration of the solver
@@ -71,6 +74,11 @@ impl<P: Problem> SolutionKeeper<P> for SimpleSolutionKeeper<P> {
     fn add_solution(&mut self, sol: &P::Sol, obj: P::Obj) {
         if obj < self.best_obj() {
             self.best_sol = Some((sol.clone(), obj));
+        }
+    }
+    fn add_solution_fn<F: FnOnce() -> P::Sol>(&mut self, f: F, obj: P::Obj) {
+        if obj < self.best_obj() {
+            self.best_sol = Some((f(), obj));
         }
     }
     fn add_dual_bound(&mut self, db: P::Obj) {
@@ -115,6 +123,10 @@ impl<T: Timer, P: Problem, SK: SolutionKeeper<P>> SolutionKeeper<P> for SolverSt
             dual_bound: None,
         });
         self.underlying.add_solution(sol, obj);
+    }
+    fn add_solution_fn<F: FnOnce() -> P::Sol>(&mut self, f: F, obj: P::Obj) {
+        let sol = f();
+        self.add_solution(&sol, obj);
     }
     fn add_dual_bound(&mut self, db: P::Obj) {
         self.events.push(SolverEvent {

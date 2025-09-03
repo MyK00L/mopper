@@ -72,7 +72,7 @@ impl<P: Problem, TS: TreeIndirectGuided<P>> Solver<P> for BeamSearch<P, TS> {
                     next_beam.add(goodness, i, cid);
                 }
                 if let Some(obj) = ts.objective(n) {
-                    sk.add_solution(&ts.to_solution(n).unwrap(), obj);
+                    sk.add_solution_fn(|| ts.to_solution(n).unwrap(), obj);
                 }
             }
             let next_beam = next_beam.get();
