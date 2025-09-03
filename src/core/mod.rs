@@ -161,6 +161,14 @@ impl<T: Timer, P: Problem, SK: SolutionKeeper<P>> SolverStats<T, P, SK> {
             problem,
         }
     }
+    pub fn finish(&mut self) {
+        self.events.push(SolverEvent {
+            time: self.timer.time(),
+            it: self.its,
+            primal_bound: None,
+            dual_bound: None,
+        });
+    }
 }
 
 /// Represents a solver for a problem

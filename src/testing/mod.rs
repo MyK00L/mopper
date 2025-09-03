@@ -126,6 +126,7 @@ fn test_single<
     let mut stats: SolverStats<T, P, SimpleSolutionKeeper<P>> =
         SolverStats::new(SimpleSolutionKeeper::default(), reduced.clone());
     solver.solve(reduced, &mut stats, stop_condition);
+    stats.finish();
     SingleTestData::from(stats)
 }
 fn test_solver<

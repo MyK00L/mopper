@@ -214,10 +214,9 @@ impl Reduction<Grid> for Grid {
 #[derive(Clone, Debug)]
 struct TreeNode {
     grid: Grid,
-    turn: u8,
+    turn: u16,
     moves: Vec<Move>,
     noni: u8,
-    nfuku: u8,
 }
 #[derive(Clone)]
 struct MyTree(Grid);
@@ -229,17 +228,16 @@ impl Tree<Grid> for MyTree {
             turn: 0,
             moves: vec![],
             noni: 40,
-            nfuku: 40,
         }
     }
     /// True if the node is a leaf (no children)
     fn is_leaf(&self, n: &Self::Node) -> bool {
-        n.noni == 0 || n.turn >= 220
+        n.noni == 0 || n.turn >= 300
     }
     /// Returns the objective value of the solution represented by this node, only if it is a leaf
     fn objective(&self, n: &Self::Node) -> Option<Obj> {
         if self.is_leaf(n) {
-            Some(Obj(n.turn as i32))
+            Some(Obj(n.turn as i32 + n.noni as i32 * 400))
         } else {
             None
         }
@@ -262,10 +260,20 @@ impl TreeIndirect<Grid> for MyTree {
     fn children_id(&self, n: &Self::Node) -> impl Iterator<Item = Self::ChildId> {
         let mut v = Vec::new();
         for i in 0..N {
-            for &d in &[Dir::U(1), Dir::D(1), Dir::L(1), Dir::R(1)] {
-                let m = Move(i, d);
-                if n.grid.can_move(m) {
-                    v.push(m);
+            for dd in 0..4 {
+                for x in 1..11u8 {
+                    let d = match dd {
+                        0 => Dir::D(x),
+                        1 => Dir::L(x),
+                        2 => Dir::R(x),
+                        _ => Dir::U(x),
+                    };
+                    let m = Move(i, d);
+                    if n.grid.can_move(m) {
+                        v.push(m);
+                    } else {
+                        break;
+                    }
                 }
             }
         }
@@ -282,38 +290,82 @@ impl TreeIndirect<Grid> for MyTree {
             .flatten()
             .filter(|&&c| c == Cell::Oni)
             .count() as u8;
-        let new_nfuku = new_grid
-            .0
-            .iter()
-            .flatten()
-            .filter(|&&c| c == Cell::Fuku)
-            .count() as u8;
+        let x = match cid.1 {
+            Dir::L(a) => a,
+            Dir::R(a) => a,
+            Dir::U(a) => a,
+            Dir::D(a) => a,
+        };
         TreeNode {
             grid: new_grid,
-            turn: n.turn + 1,
+            turn: n.turn + x as u16,
             moves: new_moves,
             noni: new_noni,
-            nfuku: new_nfuku,
         }
     }
 }
 impl TreeGuided<Grid> for MyTree {
     type Guide = Obj;
     fn goodness(&self, n: &Self::Node) -> Self::Guide {
-        Obj(n.turn as i32 + n.nfuku as i32 * 10)
+        let mut vals = [[0; 20]; 20];
+        for i in 0..20 {
+            let mut v = 1;
+            for j in 0..20 {
+                vals[i][j] = vals[i][j].min(v);
+                v += match n.grid.0[i][j] {
+                    Cell::Empty => 1,
+                    Cell::Oni => 0,
+                    Cell::Fuku => 2,
+                }
+            }
+        }
+        for i in 0..20 {
+            let mut v = 1;
+            for j in (0..20).rev() {
+                vals[i][j] = vals[i][j].min(v);
+                v += match n.grid.0[i][j] {
+                    Cell::Empty => 1,
+                    Cell::Oni => 0,
+                    Cell::Fuku => 2,
+                }
+            }
+        }
+        for j in 0..20 {
+            let mut v = 1;
+            for i in 0..20 {
+                vals[i][j] = vals[i][j].min(v);
+                v += match n.grid.0[i][j] {
+                    Cell::Empty => 1,
+                    Cell::Oni => 0,
+                    Cell::Fuku => 2,
+                }
+            }
+        }
+        for j in 0..20 {
+            let mut v = 1;
+            for i in (0..20).rev() {
+                vals[i][j] = vals[i][j].min(v);
+                v += match n.grid.0[i][j] {
+                    Cell::Empty => 1,
+                    Cell::Oni => 0,
+                    Cell::Fuku => 2,
+                }
+            }
+        }
+        let mut ans = n.turn as i32;
+        for i in 0..20 {
+            for j in 0..20 {
+                if n.grid.0[i][j] == Cell::Oni {
+                    ans += 500 + vals[i][j] * 10;
+                }
+            }
+        }
+        Obj(ans)
     }
 }
 impl TreeIndirectGuided<Grid> for MyTree {
     fn child_goodness(&self, n: &Self::Node, cid: &Self::ChildId) -> Self::Guide {
-        let mut new_grid = n.grid.clone();
-        new_grid.apply_move(*cid); // TODO: optimize
-        let new_nfuku = new_grid
-            .0
-            .iter()
-            .flatten()
-            .filter(|&&c| c == Cell::Fuku)
-            .count() as u8;
-        Obj((n.turn + 1) as i32 + new_nfuku as i32 * 10)
+        self.goodness(&self.child(n, cid)) // TODO: optimize(?)
     }
 }
 
@@ -323,8 +375,8 @@ fn main() {
     test_solvers!(
         Grid,
         Generator,
-        std::time::Duration::from_secs(2),
-        10,
-        ["beam1", BeamSearch::<Grid, MyTree>::new(200), Grid]
+        std::time::Duration::from_secs(4),
+        3,
+        ["beam1", BeamSearch::<Grid, MyTree>::new(40), Grid]
     );
 }

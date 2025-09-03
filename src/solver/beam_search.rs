@@ -62,7 +62,7 @@ impl<P: Problem, TS: TreeIndirectGuided<P>> Solver<P> for BeamSearch<P, TS> {
         let ts = TS::from(&p);
         let mut beam: Vec<TS::Node> = vec![ts.root()];
         loop {
-            if stop.stop(sk.best_obj(), P::Obj::unbounded()) {
+            if stop.stop(sk.best_obj(), P::Obj::unbounded()) || beam.is_empty() {
                 break;
             }
             sk.iter();
@@ -77,9 +77,6 @@ impl<P: Problem, TS: TreeIndirectGuided<P>> Solver<P> for BeamSearch<P, TS> {
                 }
             }
             let next_beam = next_beam.get();
-            if next_beam.is_empty() {
-                break;
-            }
             beam = next_beam
                 .into_iter()
                 .map(|(_, p, cid)| ts.child(&beam[p], &cid))
