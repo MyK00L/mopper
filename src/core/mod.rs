@@ -47,23 +47,30 @@ pub trait ProblemGenerator<P: Problem> {
 /// and to retrieve solutions from it
 pub trait SolutionKeeper<P: Problem> {
     /// should be called every time a new solution is found, even if worse
-    fn add_solution<F: FnOnce() -> P::Sol>(&mut self, sol_fn: F, obj: P::Obj);
+    fn add_solution(&mut self, sol: &P::Sol, obj: P::Obj);
     /// should be called every time a new global dual bound is found, even if worse
     fn add_dual_bound(&mut self, db: P::Obj);
     /// should be called at each iteration of the solver
     fn iter(&mut self);
     /// returns the best solution found so far, if any
     fn best_solution(&self) -> Option<(P::Sol, P::Obj)>;
+    fn best_obj(&self) -> P::Obj {
+        self.best_solution()
+            .as_ref()
+            .map_or(P::Obj::unfeas(), |x| x.1)
+    }
 }
+
+// TODO: reduction between problem -> automatic conversion between solution keepers
 
 pub struct SimpleSolutionKeeper<P: Problem> {
     pub best_sol: Option<(P::Sol, P::Obj)>,
     pub dual_bound: P::Obj,
 }
 impl<P: Problem> SolutionKeeper<P> for SimpleSolutionKeeper<P> {
-    fn add_solution<F: FnOnce() -> P::Sol>(&mut self, sol_fn: F, obj: P::Obj) {
-        if obj < self.best_sol.as_ref().map_or(P::Obj::unbounded(), |x| x.1) {
-            self.best_sol = Some((sol_fn(), obj));
+    fn add_solution(&mut self, sol: &P::Sol, obj: P::Obj) {
+        if obj < self.best_obj() {
+            self.best_sol = Some((sol.clone(), obj));
         }
     }
     fn add_dual_bound(&mut self, db: P::Obj) {
@@ -100,15 +107,14 @@ pub struct SolverStats<T: Timer, P: Problem, SK: SolutionKeeper<P>> {
     pub underlying: SK,
 }
 impl<T: Timer, P: Problem, SK: SolutionKeeper<P>> SolutionKeeper<P> for SolverStats<T, P, SK> {
-    fn add_solution<F: FnOnce() -> P::Sol>(&mut self, sol_fn: F, obj: P::Obj) {
-        let sol = sol_fn();
+    fn add_solution(&mut self, sol: &P::Sol, obj: P::Obj) {
         self.events.push(SolverEvent {
             time: self.timer.time(),
             it: self.its,
             primal_bound: Some((sol.clone(), obj)),
             dual_bound: None,
         });
-        self.underlying.add_solution(|| sol, obj);
+        self.underlying.add_solution(sol, obj);
     }
     fn add_dual_bound(&mut self, db: P::Obj) {
         self.events.push(SolverEvent {
