@@ -21,7 +21,7 @@ pub trait TreeBounded<P: Problem>: Tree<P> {
     fn dual_bound(&self, n: &Self::Node, primal: P::Obj) -> P::Obj;
 }
 pub trait TreeGuided<P: Problem>: Tree<P> {
-    type Guide: Copy + Ord + PartialOrd + Debug + Into<f64>; // = P::Obj; // associated type defaults are unstable
+    type Guide: crate::core::Objective; // = P::Obj; // associated type defaults are unstable
     fn goodness(&self, n: &Self::Node) -> Self::Guide;
 }
 pub trait TreeIndirect<P: Problem>: Tree<P> {

@@ -1,18 +1,18 @@
-use crate::core::tree_space::TreeSpace;
+use crate::core::tree_space::*;
 use crate::core::*;
 
-struct BeamHeap<P: Problem, TS: TreeSpace<P>> {
+struct BeamHeap<P: Problem, TS: TreeIndirectGuided<P>> {
     /// (dual bound, parent index in previous beam, child id)
     /// 0-based max-heap
-    heap: Vec<(P::Obj, usize, Option<TS::ChildId>)>,
+    heap: Vec<(TS::Guide, usize, Option<TS::ChildId>)>,
 }
-impl<P: Problem, TS: TreeSpace<P>> BeamHeap<P, TS> {
+impl<P: Problem, TS: TreeIndirectGuided<P>> BeamHeap<P, TS> {
     fn new(size: usize) -> Self {
         Self {
-            heap: vec![(P::Obj::unfeas(), 0, None); size],
+            heap: vec![(TS::Guide::unfeas(), 0, None); size],
         }
     }
-    fn add(&mut self, db: P::Obj, parent: usize, cid: TS::ChildId) {
+    fn add(&mut self, db: TS::Guide, parent: usize, cid: TS::ChildId) {
         if db < self.heap[0].0 {
             self.heap[0] = (db, parent, Some(cid));
             let mut i = 0;
@@ -29,7 +29,7 @@ impl<P: Problem, TS: TreeSpace<P>> BeamHeap<P, TS> {
             }
         }
     }
-    fn get(self) -> Vec<(P::Obj, usize, TS::ChildId)> {
+    fn get(self) -> Vec<(TS::Guide, usize, TS::ChildId)> {
         self.heap
             .into_iter()
             .filter_map(|(db, p, cid)| cid.map(|cid| (db, p, cid)))
@@ -37,12 +37,12 @@ impl<P: Problem, TS: TreeSpace<P>> BeamHeap<P, TS> {
     }
 }
 
-pub struct BeamSearch<P: Problem, TS: TreeSpace<P>> {
+pub struct BeamSearch<P: Problem, TS: TreeIndirectGuided<P>> {
     beam_width: usize,
     _p: std::marker::PhantomData<P>,
     _ts: std::marker::PhantomData<TS>,
 }
-impl<P: Problem, TS: TreeSpace<P>> BeamSearch<P, TS> {
+impl<P: Problem, TS: TreeIndirectGuided<P>> BeamSearch<P, TS> {
     pub fn new(beam_width: usize) -> Self {
         Self {
             beam_width,
@@ -51,37 +51,28 @@ impl<P: Problem, TS: TreeSpace<P>> BeamSearch<P, TS> {
         }
     }
 }
-impl<P: Problem, TS: TreeSpace<P>> Solver<P> for BeamSearch<P, TS> {
-    fn solve<T: stop_condition::Timer, S: stop_condition::StopCondition<P::Obj>>(
+impl<P: Problem, TS: TreeIndirectGuided<P>> Solver<P> for BeamSearch<P, TS> {
+    fn solve<SK: SolutionKeeper<P>, S: stop_condition::StopCondition<P::Obj>>(
         &mut self,
         p: P,
+        sk: &mut SK,
         mut stop: S,
-    ) -> (Option<P::Solution>, SolverStats<T, P>) {
-        let mut stats = SolverStats::new();
+    ) {
         let ts = TS::from(&p);
         let mut beam: Vec<TS::Node> = vec![ts.root()];
-        let mut best_sol: Option<P::Solution> = None;
-        let mut best_obj = P::Obj::unfeas();
-        stats.iter();
         loop {
-            if stop.stop(best_obj, P::Obj::unbounded()) {
+            if stop.stop(sk.best_obj(), P::Obj::unbounded()) {
                 break;
             }
+            sk.iter();
             let mut next_beam = BeamHeap::<P, TS>::new(self.beam_width);
             for (i, n) in beam.iter().enumerate() {
-                for cid in ts.children(n) {
-                    let db = ts.child_dual_bound(n, &cid, best_obj);
-                    if db >= best_obj {
-                        continue;
-                    }
-                    next_beam.add(db, i, cid);
+                for cid in ts.children_id(n) {
+                    let goodness: <TS as TreeGuided<P>>::Guide = ts.child_goodness(n, &cid);
+                    next_beam.add(goodness, i, cid);
                 }
                 if let Some(obj) = ts.objective(n) {
-                    if obj < best_obj {
-                        best_obj = obj;
-                        best_sol = ts.to_solution(n);
-                        stats.add_primal_bound(best_obj);
-                    }
+                    sk.add_solution(&ts.to_solution(n).unwrap(), obj);
                 }
             }
             let next_beam = next_beam.get();
@@ -92,9 +83,6 @@ impl<P: Problem, TS: TreeSpace<P>> Solver<P> for BeamSearch<P, TS> {
                 .into_iter()
                 .map(|(_, p, cid)| ts.child(&beam[p], &cid))
                 .collect();
-            stats.iter();
         }
-        stats.finish();
-        (best_sol, stats)
     }
 }

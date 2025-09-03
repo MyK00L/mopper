@@ -1,60 +1,56 @@
+use crate::core::neighbour_space::*;
 use crate::core::*;
 
-pub struct MicrocanonicalAnnealing<P: Problem, N: neighbour_space::NeighbourSpace<P>, R: rng::Rng> {
-    initial_solution: Option<P::Solution>,
+pub struct MicrocanonicalAnnealing<P: Problem, N: NeighbourhoodIndirectRandom<P>, R: rng::Rng> {
+    initial_solution: Option<(P::Sol, P::Obj)>,
     initial_demon_energy: f64,
     rng: R,
-    _n: std::marker::PhantomData<N>,
+    ns: N,
 }
-impl<P: Problem, N: neighbour_space::NeighbourSpace<P>, R: rng::Rng>
-    MicrocanonicalAnnealing<P, N, R>
-{
-    pub fn new(initial_solution: P::Solution, initial_demon_energy: f64, rng: R) -> Self {
+impl<P: Problem, N: NeighbourhoodIndirectRandom<P>, R: rng::Rng> MicrocanonicalAnnealing<P, N, R> {
+    pub fn new(
+        ns: N,
+        initial_solution: (P::Sol, P::Obj),
+        initial_demon_energy: f64,
+        rng: R,
+    ) -> Self {
         debug_assert!(initial_demon_energy >= 0.0);
         Self {
             initial_solution: Some(initial_solution),
             initial_demon_energy,
             rng,
-            _n: std::marker::PhantomData,
+            ns,
         }
     }
 }
-impl<P: Problem, N: neighbour_space::NeighbourSpace<P>, R: rng::Rng> Solver<P>
+impl<P: Problem, N: NeighbourhoodIndirectRandom<P>, R: rng::Rng> Solver<P>
     for MicrocanonicalAnnealing<P, N, R>
 {
-    fn solve<T: stop_condition::Timer, S: stop_condition::StopCondition<P::Obj>>(
+    fn solve<SK: SolutionKeeper<P>, S: stop_condition::StopCondition<P::Obj>>(
         &mut self,
         p: P,
+        sk: &mut SK,
         mut stop: S,
-    ) -> (Option<P::Solution>, SolverStats<T, P>) {
-        let mut stats = SolverStats::new();
-        let neighbour_space = N::from(&p);
-        let mut current_solution = neighbour_space.to_node(self.initial_solution.take().unwrap());
-        let mut current_obj = neighbour_space.eval(&current_solution);
-        let mut best_solution = current_solution.clone();
-        let mut best_obj = current_obj;
+    ) {
+        let (mut current_solution, mut current_obj) = self.initial_solution.take().unwrap();
+        sk.add_solution(&current_solution, current_obj);
         let mut demon_energy = self.initial_demon_energy;
-        stats.add_primal_bound(best_obj);
         loop {
-            if stop.stop(best_obj, P::Obj::unbounded()) {
+            if stop.stop(sk.best_obj(), P::Obj::unbounded()) {
                 break;
             }
-            stats.iter();
-            let nid = neighbour_space.random_neighbour(&current_solution, &mut self.rng);
-            let nobj = neighbour_space.eval_neighbour(&current_solution, &nid);
+            sk.iter();
+            let nid = self
+                .ns
+                .random_neighbour_id(&p, &current_solution, &mut self.rng);
+            let nobj = self.ns.neighbour_obj(&p, &current_solution, &nid);
             let delta = nobj.into() - current_obj.into();
             if demon_energy >= delta {
-                current_solution = neighbour_space.neighbour(current_solution, nid);
+                current_solution = self.ns.random_neighbour(&p, current_solution, nid);
                 current_obj = nobj;
                 demon_energy -= delta;
-                if current_obj < best_obj {
-                    best_solution = current_solution.clone();
-                    best_obj = current_obj;
-                    stats.add_primal_bound(best_obj);
-                }
+                sk.add_solution(&current_solution, current_obj);
             }
         }
-        stats.finish();
-        (Some(neighbour_space.to_solution(best_solution)), stats)
     }
 }

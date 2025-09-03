@@ -149,6 +149,11 @@ impl<T: Timer, P: Problem, SK: SolutionKeeper<P>> SolverStats<T, P, SK> {
 }
 
 /// Represents a solver for a problem
-pub trait Solver<P: Problem, SK: SolutionKeeper<P>> {
-    fn solve<T: Timer, S: StopCondition<P::Obj>>(&mut self, p: P, sk: &mut SK, stop: S);
+pub trait Solver<P: Problem> {
+    fn solve<SK: SolutionKeeper<P>, S: StopCondition<P::Obj>>(
+        &mut self,
+        p: P,
+        sk: &mut SK,
+        stop: S,
+    );
 }

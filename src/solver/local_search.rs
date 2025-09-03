@@ -1,105 +1,94 @@
+use crate::core::neighbour_space::*;
 use crate::core::*;
 
 pub struct FirstImprovingRandomLocalSearch<
     P: Problem,
-    N: neighbour_space::NeighbourSpace<P>,
+    N: NeighbourhoodIndirectRandom<P>,
     R: rng::Rng,
 > {
-    initial_solution: Option<P::Solution>,
+    initial_solution: Option<(P::Sol, P::Obj)>,
     rng: R,
-    _n: std::marker::PhantomData<N>,
+    ns: N,
 }
-impl<P: Problem, N: neighbour_space::NeighbourSpace<P>, R: rng::Rng>
+impl<P: Problem, N: NeighbourhoodIndirectRandom<P>, R: rng::Rng>
     FirstImprovingRandomLocalSearch<P, N, R>
 {
-    pub fn new(initial_solution: P::Solution, rng: R) -> Self {
+    pub fn new(ns: N, initial_solution: (P::Sol, P::Obj), rng: R) -> Self {
         Self {
             initial_solution: Some(initial_solution),
             rng,
-            _n: std::marker::PhantomData,
+            ns,
         }
     }
 }
-impl<P: Problem, N: neighbour_space::NeighbourSpace<P>, R: rng::Rng> Solver<P>
+impl<P: Problem, N: NeighbourhoodIndirectRandom<P>, R: rng::Rng> Solver<P>
     for FirstImprovingRandomLocalSearch<P, N, R>
 {
-    fn solve<T: stop_condition::Timer, S: stop_condition::StopCondition<P::Obj>>(
+    fn solve<SK: SolutionKeeper<P>, S: stop_condition::StopCondition<P::Obj>>(
         &mut self,
         p: P,
+        sk: &mut SK,
         mut stop: S,
-    ) -> (Option<P::Solution>, SolverStats<T, P>) {
-        let mut stats = SolverStats::new();
-        let neighbour_space = N::from(&p);
-        let mut solution = neighbour_space.to_node(self.initial_solution.take().unwrap());
-        let mut obj = neighbour_space.eval(&solution);
-        stats.add_primal_bound(obj);
-        stats.iter();
+    ) {
+        let (mut solution, mut obj) = self.initial_solution.take().unwrap();
         loop {
-            if stop.stop(obj, P::Obj::unbounded()) {
+            if stop.stop(sk.best_obj(), P::Obj::unbounded()) {
                 break;
             }
-            let nid = neighbour_space.random_neighbour(&solution, &mut self.rng);
-            let nobj = neighbour_space.eval_neighbour(&solution, &nid);
+            sk.iter();
+            let nid = self.ns.random_neighbour_id(&p, &solution, &mut self.rng);
+            let nobj = self.ns.neighbour_obj(&p, &solution, &nid);
             if nobj < obj {
-                solution = neighbour_space.neighbour(solution, nid);
+                solution = self.ns.random_neighbour(&p, solution, nid);
                 obj = nobj;
-                stats.add_primal_bound(obj);
+                sk.add_solution(&solution, obj);
             }
-            stats.iter();
         }
-        stats.finish();
-        (Some(neighbour_space.to_solution(solution)), stats)
     }
 }
 
-pub struct SteepestDescentLocalSearch<P: Problem, N: neighbour_space::NeighbourSpace<P>> {
-    initial_solution: Option<P::Solution>,
-    _n: std::marker::PhantomData<N>,
+pub struct SteepestDescentLocalSearch<P: Problem, N: NeighbourhoodIndirect<P>> {
+    initial_solution: Option<(P::Sol, P::Obj)>,
+    ns: N,
 }
-impl<P: Problem, N: neighbour_space::NeighbourSpace<P>> SteepestDescentLocalSearch<P, N> {
-    pub fn new(initial_solution: P::Solution) -> Self {
+impl<P: Problem, N: NeighbourhoodIndirect<P>> SteepestDescentLocalSearch<P, N> {
+    pub fn new(ns: N, initial_solution: (P::Sol, P::Obj)) -> Self {
         Self {
             initial_solution: Some(initial_solution),
-            _n: std::marker::PhantomData,
+            ns,
         }
     }
 }
-impl<P: Problem, N: neighbour_space::NeighbourSpace<P>> Solver<P>
-    for SteepestDescentLocalSearch<P, N>
-{
-    fn solve<T: stop_condition::Timer, S: stop_condition::StopCondition<P::Obj>>(
+impl<P: Problem, N: NeighbourhoodIndirect<P>> Solver<P> for SteepestDescentLocalSearch<P, N> {
+    fn solve<SK: SolutionKeeper<P>, S: stop_condition::StopCondition<P::Obj>>(
         &mut self,
         p: P,
+        sk: &mut SK,
         mut stop: S,
-    ) -> (Option<P::Solution>, SolverStats<T, P>) {
-        let mut stats = SolverStats::new();
-        let neighbour_space = N::from(&p);
-        let mut solution = neighbour_space.to_node(self.initial_solution.take().unwrap());
-        let mut obj = neighbour_space.eval(&solution);
-        stats.add_primal_bound(obj);
+    ) {
+        let (mut solution, mut obj) = self.initial_solution.take().unwrap();
+        sk.add_solution(&solution, obj);
         loop {
             if stop.stop(obj, P::Obj::unbounded()) {
                 break;
             }
-            stats.iter();
+            sk.iter();
             let mut best_nid = None;
             let mut best_nobj = obj;
-            for nid in neighbour_space.neighbourhood(&solution) {
-                let nobj = neighbour_space.eval_neighbour(&solution, &nid);
+            for nid in self.ns.neighbourhood_id(&p, &solution) {
+                let nobj = self.ns.neighbour_obj(&p, &solution, &nid);
                 if nobj < best_nobj {
                     best_nobj = nobj;
                     best_nid = Some(nid);
                 }
             }
             if let Some(nid) = best_nid {
-                solution = neighbour_space.neighbour(solution, nid);
+                solution = self.ns.neighbour(&p, solution, nid);
                 obj = best_nobj;
-                stats.add_primal_bound(obj);
+                sk.add_solution(&solution, obj);
             } else {
                 break;
             }
         }
-        stats.finish();
-        (Some(neighbour_space.to_solution(solution)), stats)
     }
 }
