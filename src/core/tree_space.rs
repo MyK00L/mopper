@@ -21,7 +21,8 @@ pub trait TreeBounded<P: Problem>: Tree<P> {
     fn dual_bound(&self, n: &Self::Node, primal: P::Obj) -> P::Obj;
 }
 pub trait TreeGuided<P: Problem>: Tree<P> {
-    fn goodness(&self, n: &Self::Node) -> P::Obj;
+    type Guide: Copy + Ord + PartialOrd + Debug + Into<f64>; // = P::Obj; // associated type defaults are unstable
+    fn goodness(&self, n: &Self::Node) -> Self::Guide;
 }
 pub trait TreeIndirect<P: Problem>: Tree<P> {
     type ChildId: Clone + Debug;
@@ -32,12 +33,13 @@ pub trait TreeIndirectBounded<P: Problem>: TreeIndirect<P> {
     fn child_primal_bound(&self, n: &Self::Node, cid: &Self::ChildId) -> P::Obj;
     fn child_dual_bound(&self, n: &Self::Node, cid: &Self::ChildId, primal: P::Obj) -> P::Obj;
 }
-pub trait TreeIndirectGuided<P: Problem>: TreeIndirect<P> {
-    fn child_goodness(&self, n: &Self::Node, cid: &Self::ChildId) -> P::Obj;
+pub trait TreeIndirectGuided<P: Problem>: TreeIndirect<P> + TreeGuided<P> {
+    fn child_goodness(&self, n: &Self::Node, cid: &Self::ChildId) -> Self::Guide;
 }
 pub trait TreeDirectRandom<P: Problem>: Tree<P> {
     fn random_child<R: rng::Rng>(&self, n: &Self::Node, rng: &mut R) -> Option<Self::Node>;
-    fn random_child_consuming<R: rng::Rng>(&self, n: Self::Node, rng: &mut R) -> Option<Self::Node>;
+    fn random_child_consuming<R: rng::Rng>(&self, n: Self::Node, rng: &mut R)
+        -> Option<Self::Node>;
 }
 pub trait TreeRollback<P: Problem>: Tree<P> {
     type RollbackInfo: Clone + Debug;
@@ -53,7 +55,10 @@ pub trait TreeRollbackDirectRandom<P: Problem>: TreeRollback<P> {
 pub trait TreeRollbackIndirect<P: Problem>: TreeRollback<P> {
     type ChildIdR: Clone + Debug;
     /// Returns an iterator over the children of a node along with the rollback info to get back to the parent
-    fn children_id_rollback(&self, n: &Self::Node) -> impl Iterator<Item = (Self::ChildIdR, Self::RollbackInfo)>;
+    fn children_id_rollback(
+        &self,
+        n: &Self::Node,
+    ) -> impl Iterator<Item = (Self::ChildIdR, Self::RollbackInfo)>;
     /// Returns the child node given its id
     fn child_r(&self, n: Self::Node, cid: &Self::ChildIdR) -> Self::Node;
 }
