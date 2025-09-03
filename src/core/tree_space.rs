@@ -16,6 +16,13 @@ pub trait Tree<P: Problem> {
 pub trait TreeDirect<P: Problem>: Tree<P> {
     fn children(&self, n: &Self::Node) -> impl Iterator<Item = Self::Node>;
 }
+pub trait TreeBounded<P: Problem>: Tree<P> {
+    fn primal_bound(&self, n: &Self::Node) -> P::Obj;
+    fn dual_bound(&self, n: &Self::Node, primal: P::Obj) -> P::Obj;
+}
+pub trait TreeGuided<P: Problem>: Tree<P> {
+    fn goodness(&self, n: &Self::Node) -> P::Obj;
+}
 pub trait TreeIndirect<P: Problem>: Tree<P> {
     type ChildId: Clone + Debug;
     fn children_id(&self, n: &Self::Node) -> impl Iterator<Item = Self::ChildId>;
@@ -25,13 +32,12 @@ pub trait TreeIndirectBounded<P: Problem>: TreeIndirect<P> {
     fn child_primal_bound(&self, n: &Self::Node, cid: &Self::ChildId) -> P::Obj;
     fn child_dual_bound(&self, n: &Self::Node, cid: &Self::ChildId, primal: P::Obj) -> P::Obj;
 }
+pub trait TreeIndirectGuided<P: Problem>: TreeIndirect<P> {
+    fn child_goodness(&self, n: &Self::Node, cid: &Self::ChildId) -> P::Obj;
+}
 pub trait TreeDirectRandom<P: Problem>: Tree<P> {
     fn random_child<R: rng::Rng>(&self, n: &Self::Node, rng: &mut R) -> Option<Self::Node>;
     fn random_child_consuming<R: rng::Rng>(&self, n: Self::Node, rng: &mut R) -> Option<Self::Node>;
-}
-pub trait TreeBounded<P: Problem>: Tree<P> {
-    fn primal_bound(&self, n: &Self::Node) -> P::Obj;
-    fn dual_bound(&self, n: &Self::Node, primal: P::Obj) -> P::Obj;
 }
 pub trait TreeRollback<P: Problem>: Tree<P> {
     type RollbackInfo: Clone + Debug;
