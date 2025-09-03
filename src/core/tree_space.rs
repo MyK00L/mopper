@@ -1,6 +1,6 @@
 use crate::core::*;
 
-pub trait Tree<P: Problem> {
+pub trait Tree<P: Problem>: Clone {
     type Node: Clone + Debug;
     /// Returns the root node of the search space
     fn root(&self) -> Self::Node;

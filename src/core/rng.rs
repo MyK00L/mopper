@@ -1,5 +1,6 @@
 /// Trait for random number generation
 pub trait Rng: Clone {
+    fn from_u64(seed: u64) -> Self;
     fn next_u64(&mut self) -> u64;
     fn next01(&mut self) -> f64 {
         self.next_u64() as f64 / u64::MAX as f64
@@ -8,12 +9,10 @@ pub trait Rng: Clone {
 /// The actual random number generator
 #[derive(Clone, Copy)]
 pub struct Splitmix64(u64);
-impl Splitmix64 {
-    pub fn from_u64(seed: u64) -> Self {
+impl Rng for Splitmix64 {
+    fn from_u64(seed: u64) -> Self {
         Self(seed)
     }
-}
-impl Rng for Splitmix64 {
     fn next_u64(&mut self) -> u64 {
         let mut z = self.0.wrapping_add(0x9e3779b97f4a7c15);
         self.0 = z;

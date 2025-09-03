@@ -1,6 +1,7 @@
 use crate::core::neighbour_space::*;
 use crate::core::*;
 
+#[derive(Clone)]
 pub struct FirstImprovingRandomLocalSearch<
     P: Problem,
     N: NeighbourhoodIndirectRandom<P>,
@@ -47,6 +48,7 @@ impl<P: Problem, N: NeighbourhoodIndirectRandom<P>, R: rng::Rng> Solver<P>
     }
 }
 
+#[derive(Clone)]
 pub struct SteepestDescentLocalSearch<P: Problem, N: NeighbourhoodIndirect<P>> {
     initial_solution: Option<(P::Sol, P::Obj)>,
     ns: N,

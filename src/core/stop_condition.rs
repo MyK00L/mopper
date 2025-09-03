@@ -55,23 +55,43 @@ impl Timer for StdTimer {
     }
 }
 
+pub type DefaultTimer = StdTimer;
+
 /// represent a stopping condition for solvers
 /// could be called many times, so it should be fast to add low overhead
-pub trait StopCondition<Obj: Objective> {
+pub trait StopCondition<Obj: Objective>: Clone {
     fn stop(&mut self, primal_bound: Obj, dual_bound: Obj) -> bool;
 }
 
 pub struct TimeStop<T: Timer> {
     timer: T,
-    stop: T::Instant,
+    start: T::Instant,
+    duration: std::time::Duration,
+}
+impl<T: Timer> Clone for TimeStop<T> {
+    fn clone(&self) -> Self {
+        let time = self.timer.time();
+        Self {
+            timer: self.timer.clone(),
+            start: time,
+            duration: self.duration,
+        }
+    }
 }
 impl<T: Timer> TimeStop<T> {
-    pub fn new(timer: T, stop: T::Instant) -> Self {
-        Self { timer, stop }
+    pub fn new(timer: T, duration: std::time::Duration) -> Self {
+        let time = timer.time();
+        Self {
+            timer,
+            start: time,
+            duration,
+        }
     }
 }
 impl<T: Timer, Obj: Objective> StopCondition<Obj> for TimeStop<T> {
     fn stop(&mut self, _primal_bound: Obj, _dual_bound: Obj) -> bool {
-        self.timer.time() >= self.stop
+        self.timer.time() >= self.start + self.duration
     }
 }
+
+// TODO: more stop conditions

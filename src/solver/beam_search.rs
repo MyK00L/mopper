@@ -37,6 +37,7 @@ impl<P: Problem, TS: TreeIndirectGuided<P>> BeamHeap<P, TS> {
     }
 }
 
+#[derive(Clone)]
 pub struct BeamSearch<P: Problem, TS: TreeIndirectGuided<P>> {
     beam_width: usize,
     _p: std::marker::PhantomData<P>,

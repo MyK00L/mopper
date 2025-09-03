@@ -1,10 +1,11 @@
 use crate::core::*;
 use neighbour_space::*;
 
-pub trait CoolingSchedule {
+pub trait CoolingSchedule: Clone {
     fn temperature(&mut self, obj: f64) -> f64;
 }
 
+#[derive(Clone)]
 pub struct SimulatedAnnealing<
     P: Problem,
     N: NeighbourhoodIndirectRandom<P>,
@@ -64,6 +65,7 @@ impl<P: Problem, N: NeighbourhoodIndirectRandom<P>, R: rng::Rng, CS: CoolingSche
 /// arithmetic if a=1
 /// geometric if b=0
 /// if |a|<1 converges to b/(1-a)
+#[derive(Clone)]
 pub struct ArithmeticGeometricCooling {
     temp: f64,
     a: f64,

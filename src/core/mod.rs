@@ -34,13 +34,14 @@ pub trait Problem: Clone + Debug {
 }
 
 pub trait Reduction<P: Problem>: Problem {
-    fn reduce_from(&self, p: &P) -> Self;
+    fn reduce_from(p: &P) -> Self;
     fn lift_solution_to(&self, sol: Self::Sol) -> P::Sol;
+    fn lift_obj_to(&self, obj: Self::Obj) -> P::Obj;
 }
 
 /// Represents a generator for a problem with a certain distribution
-pub trait ProblemGenerator<P: Problem> {
-    fn generate<R: rng::Rng>(rng: &mut R) -> P;
+pub trait ProblemGenerator<P: Problem>: Clone {
+    fn generate<R: rng::Rng>(&self, rng: &mut R) -> P;
 }
 
 /// Used both to pass solutions to a solver
@@ -113,6 +114,7 @@ pub struct SolverStats<T: Timer, P: Problem, SK: SolutionKeeper<P>> {
     pub last_time: T::Instant,
     pub timer: T,
     pub underlying: SK,
+    pub problem: P,
 }
 impl<T: Timer, P: Problem, SK: SolutionKeeper<P>> SolutionKeeper<P> for SolverStats<T, P, SK> {
     fn add_solution(&mut self, sol: &P::Sol, obj: P::Obj) {
@@ -147,7 +149,7 @@ impl<T: Timer, P: Problem, SK: SolutionKeeper<P>> SolutionKeeper<P> for SolverSt
     }
 }
 impl<T: Timer, P: Problem, SK: SolutionKeeper<P>> SolverStats<T, P, SK> {
-    pub fn new(underlying: SK) -> Self {
+    pub fn new(underlying: SK, problem: P) -> Self {
         let timer = T::default();
         Self {
             its: 0,
@@ -156,12 +158,13 @@ impl<T: Timer, P: Problem, SK: SolutionKeeper<P>> SolverStats<T, P, SK> {
             last_time: timer.time(),
             timer,
             underlying,
+            problem,
         }
     }
 }
 
 /// Represents a solver for a problem
-pub trait Solver<P: Problem> {
+pub trait Solver<P: Problem>: Clone {
     fn solve<SK: SolutionKeeper<P>, S: StopCondition<P::Obj>>(
         &mut self,
         p: P,

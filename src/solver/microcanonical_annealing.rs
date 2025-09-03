@@ -1,6 +1,7 @@
 use crate::core::neighbour_space::*;
 use crate::core::*;
 
+#[derive(Clone)]
 pub struct MicrocanonicalAnnealing<P: Problem, N: NeighbourhoodIndirectRandom<P>, R: rng::Rng> {
     initial_solution: Option<(P::Sol, P::Obj)>,
     initial_demon_energy: f64,
