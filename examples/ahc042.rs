@@ -1,6 +1,8 @@
+#![allow(clippy::needless_range_loop)]
 use mopper::core::{tree_space::*, *};
+use mopper::utils::bloom_filter::BloomFilter;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[repr(u8)]
 enum Cell {
     Empty,
@@ -17,7 +19,7 @@ enum Dir {
 #[derive(Copy, Clone, Debug)]
 struct Move(u8, Dir);
 const N: u8 = 20;
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
 struct Grid([[Cell; N as usize]; N as usize]);
 impl Grid {
     fn apply_move(&mut self, m: Move) {
@@ -218,6 +220,12 @@ struct TreeNode {
     moves: Vec<Move>,
     noni: u8,
 }
+impl std::hash::Hash for TreeNode {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.grid.hash(state);
+        self.turn.hash(state);
+    }
+}
 #[derive(Clone)]
 struct MyTree(Grid);
 impl Tree<Grid> for MyTree {
@@ -375,8 +383,12 @@ fn main() {
     test_solvers!(
         Grid,
         Generator,
-        std::time::Duration::from_secs(4),
-        3,
-        ["beam1", BeamSearch::<Grid, MyTree>::new(40), Grid]
+        std::time::Duration::from_secs(2),
+        10,
+        [
+            "beam1",
+            BeamSearch::<Grid, MyTree, BloomFilter<TreeNode, 1000, 2048>>::new(40),
+            Grid
+        ]
     );
 }

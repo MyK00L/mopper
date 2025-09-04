@@ -1,0 +1,69 @@
+use crate::utils::bitarray::BitArray;
+use std::hash::{BuildHasher, Hash, RandomState};
+use std::marker::PhantomData;
+
+/// N is item count
+/// M is bit count
+pub struct BloomFilter<T: Hash, const N: usize, const M: usize> {
+    bits: BitArray<M>,
+    _t: PhantomData<T>,
+    hashers: [RandomState; 2],
+    k_num: usize,
+}
+impl<T: Hash, const N: usize, const M: usize> Clone for BloomFilter<T, N, M> {
+    fn clone(&self) -> Self {
+        Self {
+            bits: self.bits.clone(),
+            _t: PhantomData,
+            hashers: self.hashers.clone(),
+            k_num: self.k_num,
+        }
+    }
+}
+impl<T: Hash, const N: usize, const M: usize> Default for BloomFilter<T, N, M> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<T: Hash, const N: usize, const M: usize> BloomFilter<T, N, M> {
+    pub fn new() -> Self {
+        let bits = BitArray::new();
+        let hashers = [RandomState::new(), RandomState::new()];
+        let k_num = ((M as f64 / N as f64) * (2.0f64.ln())).round() as usize;
+        Self {
+            bits,
+            _t: PhantomData,
+            hashers,
+            k_num,
+        }
+    }
+    fn hash(&self, item: &T, hashes: &mut [u64; 2], k_i: usize) -> usize {
+        if k_i < 2 {
+            hashes[k_i] = self.hashers[k_i].hash_one(item);
+            hashes[k_i] as usize
+        } else {
+            (hashes[0].wrapping_add(k_i as u64).wrapping_mul(hashes[1])) as usize
+        }
+    }
+    pub fn insert(&mut self, item: &T) -> bool {
+        let mut present = true;
+        let hashes = &mut [0u64; 2];
+        for i in 0..self.k_num {
+            let h = self.hash(item, hashes, i);
+            present &= self.bits.get(h % M);
+            self.bits.set(h % M);
+        }
+        present
+    }
+    pub fn contains(&self, item: &T) -> bool {
+        let hashes = &mut [0u64; 2];
+        for i in 0..self.k_num {
+            let h = self.hash(item, hashes, i);
+            if !self.bits.get(h % M) {
+                return false;
+            }
+        }
+        true
+    }
+}

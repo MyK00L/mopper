@@ -3,3 +3,4 @@ pub mod lp;
 pub mod sat;
 pub mod solver;
 pub mod testing;
+pub mod utils;
