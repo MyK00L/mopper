@@ -129,7 +129,7 @@ fn test_single<
         let real_obj = problem.obj(&reduced.lift_solution_to(best_sol));
         let obj = reduced.lift_obj_to(best_obj);
         if (real_obj.into() - obj.into()).abs() > 1e-8 {
-            eprint!(
+            eprintln!(
                 "objective value calculated from solver is wrong: {:?} (correct={:?})",
                 obj, real_obj
             );
