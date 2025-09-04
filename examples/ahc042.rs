@@ -19,8 +19,25 @@ enum Dir {
 #[derive(Copy, Clone, Debug)]
 struct Move(u8, Dir);
 const N: u8 = 20;
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+#[derive(Clone, Hash, PartialEq, Eq)]
 struct Grid([[Cell; N as usize]; N as usize]);
+impl std::fmt::Debug for Grid {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "20")?;
+        for i in 0..N {
+            for j in 0..N {
+                let c = match self.0[i as usize][j as usize] {
+                    Cell::Empty => '.',
+                    Cell::Oni => 'x',
+                    Cell::Fuku => 'o',
+                };
+                write!(f, "{}", c)?;
+            }
+            writeln!(f)?;
+        }
+        Ok(())
+    }
+}
 impl Grid {
     fn apply_move(&mut self, m: Move) {
         match m.1 {
@@ -189,14 +206,45 @@ impl Objective for Obj {
         self.0 != i32::MIN
     }
 }
+#[derive(Clone)]
+struct SolType(Vec<Move>);
 impl Problem for Grid {
-    type Sol = Vec<Move>;
+    type Sol = SolType;
     type Obj = Obj;
     fn obj(&self, _sol: &Self::Sol) -> Self::Obj {
         unimplemented!();
     }
     fn is_feasible(&self, _sol: &Self::Sol) -> bool {
         true
+    }
+}
+impl std::fmt::Debug for SolType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for m in &self.0 {
+            match m.1 {
+                Dir::L(x) => {
+                    for _ in 0..x {
+                        writeln!(f, "L {}", m.0)?;
+                    }
+                }
+                Dir::R(x) => {
+                    for _ in 0..x {
+                        writeln!(f, "R {}", m.0)?;
+                    }
+                }
+                Dir::U(x) => {
+                    for _ in 0..x {
+                        writeln!(f, "U {}", m.0)?;
+                    }
+                }
+                Dir::D(x) => {
+                    for _ in 0..x {
+                        writeln!(f, "D {}", m.0)?;
+                    }
+                }
+            };
+        }
+        Ok(())
     }
 }
 impl Reduction<Grid> for Grid {
@@ -213,12 +261,17 @@ impl Reduction<Grid> for Grid {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 struct TreeNode {
     grid: Grid,
     turn: u16,
     moves: Vec<Move>,
     noni: u8,
+}
+impl std::fmt::Debug for TreeNode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.moves.len())
+    }
 }
 impl std::hash::Hash for TreeNode {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
@@ -227,20 +280,23 @@ impl std::hash::Hash for TreeNode {
     }
 }
 #[derive(Clone)]
-struct MyTree(Grid);
+struct MyTree {
+    root_grid: Grid,
+}
+impl MyTree {
+    fn is_leaf(&self, n: &<MyTree as Tree<Grid>>::Node) -> bool {
+        n.noni == 0 || n.turn >= 10
+    }
+}
 impl Tree<Grid> for MyTree {
     type Node = TreeNode;
     fn root(&self) -> Self::Node {
         TreeNode {
-            grid: self.0.clone(),
+            grid: self.root_grid.clone(),
             turn: 0,
             moves: vec![],
             noni: 40,
         }
-    }
-    /// True if the node is a leaf (no children)
-    fn is_leaf(&self, n: &Self::Node) -> bool {
-        n.noni == 0 || n.turn >= 300
     }
     /// Returns the objective value of the solution represented by this node, only if it is a leaf
     fn objective(&self, n: &Self::Node) -> Option<Obj> {
@@ -251,22 +307,27 @@ impl Tree<Grid> for MyTree {
         }
     }
     /// Converts a leaf node to a solution
-    fn to_solution(&self, n: &Self::Node) -> Option<Vec<Move>> {
+    fn to_solution(&self, n: &Self::Node) -> Option<SolType> {
         if self.is_leaf(n) {
-            Some(n.moves.clone())
+            Some(SolType(n.moves.clone()))
         } else {
             None
         }
     }
     /// Constructs a tree space from a problem instance
     fn from(p: &Grid) -> Self {
-        MyTree(p.clone())
+        MyTree {
+            root_grid: p.clone(),
+        }
     }
 }
 impl TreeIndirect<Grid> for MyTree {
     type ChildId = Move;
     fn children_id(&self, n: &Self::Node) -> impl Iterator<Item = Self::ChildId> {
         let mut v = Vec::new();
+        if n.noni == 0 {
+            return v.into_iter();
+        }
         for i in 0..N {
             for dd in 0..4 {
                 for x in 1..11u8 {
@@ -323,7 +384,7 @@ impl TreeGuided<Grid> for MyTree {
                 v += match n.grid.0[i][j] {
                     Cell::Empty => 1,
                     Cell::Oni => 0,
-                    Cell::Fuku => 2,
+                    Cell::Fuku => 3,
                 }
             }
         }
@@ -334,7 +395,7 @@ impl TreeGuided<Grid> for MyTree {
                 v += match n.grid.0[i][j] {
                     Cell::Empty => 1,
                     Cell::Oni => 0,
-                    Cell::Fuku => 2,
+                    Cell::Fuku => 3,
                 }
             }
         }
@@ -345,7 +406,7 @@ impl TreeGuided<Grid> for MyTree {
                 v += match n.grid.0[i][j] {
                     Cell::Empty => 1,
                     Cell::Oni => 0,
-                    Cell::Fuku => 2,
+                    Cell::Fuku => 3,
                 }
             }
         }
@@ -356,7 +417,7 @@ impl TreeGuided<Grid> for MyTree {
                 v += match n.grid.0[i][j] {
                     Cell::Empty => 1,
                     Cell::Oni => 0,
-                    Cell::Fuku => 2,
+                    Cell::Fuku => 3,
                 }
             }
         }
@@ -383,11 +444,15 @@ fn main() {
     test_solvers!(
         Grid,
         Generator,
-        std::time::Duration::from_secs(2),
-        10,
+        std::time::Duration::from_secs(4),
+        1,
         [
+            "beam0",
+            BeamSearch::<Grid, MyTree, BloomFilter<TreeNode, 1000, 2048>>::new(32),
+            Grid
+            ;
             "beam1",
-            BeamSearch::<Grid, MyTree, BloomFilter<TreeNode, 1000, 2048>>::new(40),
+            BeamSearch::<Grid, MyTree, BloomFilter<TreeNode, 10000, 65536>>::new(64),
             Grid
         ]
     );

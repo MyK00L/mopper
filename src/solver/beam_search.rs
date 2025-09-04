@@ -45,6 +45,7 @@ impl<P: Problem, TS: TreeIndirectGuided<P>, S: Set<TS::Node>> Solver<P> for Beam
                     sk.add_solution_fn(|| ts.to_solution(n).unwrap(), obj);
                 }
             }
+
             next_beam.sort_by_key(|(g, _, _)| *g);
             beam = next_beam
                 .into_iter()

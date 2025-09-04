@@ -4,11 +4,9 @@ pub trait Tree<P: Problem>: Clone {
     type Node: Clone + Debug;
     /// Returns the root node of the search space
     fn root(&self) -> Self::Node;
-    /// True if the node is a leaf (no children)
-    fn is_leaf(&self, n: &Self::Node) -> bool;
-    /// Returns the objective value of the solution represented by this node, only if it is a leaf
+    /// Returns the objective value of the solution represented by this node, if it represents a solution at all
     fn objective(&self, n: &Self::Node) -> Option<P::Obj>;
-    /// Converts a leaf node to a solution
+    /// Converts a node to a solution, if it represents a solution
     fn to_solution(&self, n: &Self::Node) -> Option<P::Sol>;
     /// Constructs a tree space from a problem instance
     fn from(p: &P) -> Self;

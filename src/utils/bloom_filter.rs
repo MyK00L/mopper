@@ -1,13 +1,13 @@
-use crate::utils::bitarray::BitArray;
-use std::hash::{BuildHasher, Hash, RandomState};
+use crate::utils::{bitarray::BitArray, fx_hasher::FxBuildHasher};
+use std::hash::{BuildHasher, Hash};
 use std::marker::PhantomData;
 
 /// N is item count
-/// M is bit count
+/// M is bit count = -(N * ln(p)) / (ln(2)^2) where p is false positive rate
 pub struct BloomFilter<T: Hash, const N: usize, const M: usize> {
     bits: BitArray<M>,
     _t: PhantomData<T>,
-    hashers: [RandomState; 2],
+    hashers: [FxBuildHasher; 2],
     k_num: usize,
 }
 impl<T: Hash, const N: usize, const M: usize> Clone for BloomFilter<T, N, M> {
@@ -15,7 +15,7 @@ impl<T: Hash, const N: usize, const M: usize> Clone for BloomFilter<T, N, M> {
         Self {
             bits: self.bits.clone(),
             _t: PhantomData,
-            hashers: self.hashers.clone(),
+            hashers: self.hashers,
             k_num: self.k_num,
         }
     }
@@ -29,7 +29,7 @@ impl<T: Hash, const N: usize, const M: usize> Default for BloomFilter<T, N, M> {
 impl<T: Hash, const N: usize, const M: usize> BloomFilter<T, N, M> {
     pub fn new() -> Self {
         let bits = BitArray::new();
-        let hashers = [RandomState::new(), RandomState::new()];
+        let hashers = [FxBuildHasher(4), FxBuildHasher(42)];
         let k_num = ((M as f64 / N as f64) * (2.0f64.ln())).round() as usize;
         Self {
             bits,

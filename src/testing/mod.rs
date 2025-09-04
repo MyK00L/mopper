@@ -1,5 +1,8 @@
 #![allow(dead_code)]
 
+mod solver_stats;
+use solver_stats::*;
+
 use crate::core::rng::*;
 use crate::core::stop_condition::*;
 use crate::core::*;
@@ -58,14 +61,8 @@ impl SingleTestData {
                     },
                     |st, item| {
                         // pb,db,time,it should already be ordered
-                        st.pb = item
-                            .primal_bound
-                            .as_ref()
-                            .map_or(st.pb, |(_sol, obj)| stats.problem.lift_obj_to(*obj).into());
-                        st.db = item
-                            .dual_bound
-                            .map(|obj| stats.problem.lift_obj_to(obj).into())
-                            .unwrap_or(st.db);
+                        st.pb = item.primal_bound.into();
+                        st.db = item.dual_bound.into();
                         st.time = item.time - stats.start_time;
                         st.it = item.it;
                         Some(*st)
@@ -125,8 +122,24 @@ fn test_single<
     let reduced = P::reduce_from(problem);
     let mut stats: SolverStats<T, P, SimpleSolutionKeeper<P>> =
         SolverStats::new(SimpleSolutionKeeper::default(), reduced.clone());
-    solver.solve(reduced, &mut stats, stop_condition);
+    solver.solve(reduced.clone(), &mut stats, stop_condition);
     stats.finish();
+    #[cfg(false)]
+    if let Some((best_sol, best_obj)) = stats.best_solution() {
+        let real_obj = problem.obj(&reduced.lift_solution_to(best_sol));
+        let obj = reduced.lift_obj_to(best_obj);
+        if (real_obj.into() - obj.into()).abs() > 1e-8 {
+            eprint!(
+                "objective value calculated from solver is wrong: {:?} (correct={:?})",
+                obj, real_obj
+            );
+        }
+    }
+    #[cfg(false)]
+    if let Some((best_sol, _best_obj)) = stats.best_solution() {
+        eprintln!("{:?}", problem);
+        eprintln!("{:?}", best_sol);
+    }
     SingleTestData::from(stats)
 }
 fn test_solver<
