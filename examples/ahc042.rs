@@ -325,7 +325,7 @@ impl TreeIndirect<Grid> for MyTree {
     type ChildId = Move;
     fn children_id(&self, n: &Self::Node) -> impl Iterator<Item = Self::ChildId> {
         let mut v = Vec::new();
-        if n.noni == 0 {
+        if n.noni == 0 || n.turn >= 200 {
             return v.into_iter();
         }
         for i in 0..N {
@@ -425,7 +425,7 @@ impl TreeGuided<Grid> for MyTree {
         for i in 0..20 {
             for j in 0..20 {
                 if n.grid.0[i][j] == Cell::Oni {
-                    ans += 500 + vals[i][j] * 10;
+                    ans += 100 + vals[i][j] * 4;
                 }
             }
         }
@@ -445,7 +445,7 @@ fn main() {
         Grid,
         Generator,
         std::time::Duration::from_secs(4),
-        1,
+        5,
         [
             "beam0",
             BeamSearch::<Grid, MyTree, BloomFilter<TreeNode, 1000, 2048>>::new(32),
@@ -453,6 +453,10 @@ fn main() {
             ;
             "beam1",
             BeamSearch::<Grid, MyTree, BloomFilter<TreeNode, 10000, 65536>>::new(64),
+            Grid
+            ;
+            "beam2",
+            BeamSearch::<Grid, MyTree>::new(64),
             Grid
         ]
     );

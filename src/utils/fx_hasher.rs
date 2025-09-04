@@ -171,3 +171,14 @@ impl BuildHasher for FxBuildHasher {
         FxHasher::with_seed(self.0)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_fxbuildhasher() {
+        let h1 = FxBuildHasher(4);
+        let h2 = FxBuildHasher(42);
+        assert!(h1.hash_one(&69) != h2.hash_one(&69));
+    }
+}

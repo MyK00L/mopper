@@ -67,3 +67,49 @@ impl<T: Hash, const N: usize, const M: usize> BloomFilter<T, N, M> {
         true
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_bloom_filter_correctness() {
+        #[allow(unused)]
+        const P: f64 = 0.000001; // false positive rate
+        const N: usize = 1000;
+        const M: usize = 28756; // ((-(N as f64) * P.ln()) / ( 2.0f64.ln() * 2.0f64.ln() )).ceil() as usize;
+        let mut bf = BloomFilter::<usize, N, M>::new();
+        for i in 0..N {
+            assert!(
+                !bf.contains(&i),
+                "bf contains i: {}, might have been unlucky",
+                i
+            );
+            assert!(!bf.insert(&i));
+            assert!(bf.contains(&i));
+            assert!(bf.insert(&i));
+        }
+        for i in 0..N {
+            assert!(bf.contains(&i));
+        }
+        for i in N..2 * N {
+            assert!(!bf.contains(&i));
+        }
+    }
+    #[test]
+    fn test_bloom_filter_false_positive_rate() {
+        #[allow(unused)]
+        const P: f64 = 0.01; // false positive rate
+        const N: usize = 2000;
+        const M: usize = 19171; // ((-(N as f64) * P.ln()) / ( 2.0f64.ln() * 2.0f64.ln() )).ceil() as usize;
+        let mut bf = BloomFilter::<u32, N, M>::new();
+        let mut count = 0;
+        for i in 0..2000 {
+            if bf.insert(&i) {
+                count += 1;
+            }
+        }
+        assert!(count < 30, "false positive count: {}", count);
+        assert!(bf.contains(&42));
+        assert!(!bf.contains(&4242));
+    }
+}
